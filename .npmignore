@@ -1,0 +1,39 @@
+# Source files
+src/
+
+# Build config
+tsconfig.json
+rollup.config.js
+.eslintrc.json
+.prettierrc.json
+
+# IDE
+.vscode/
+.idea/
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+
+# Examples (keep examples in npm for reference)
+# examples/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation source
+docs/
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)"
+    ],
+    "additionalDirectories": [
+      "D:\\Project\\DeveloperWorks-UnitySDK"
+    ]
+  }
+}
