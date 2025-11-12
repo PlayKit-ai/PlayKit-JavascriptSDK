@@ -1,7 +1,7 @@
 {
   "name": "playkit-sdk",
   "version": "1.0.0-beta.1",
-  "description": "PlayKit SDK for JavaScript - AI integration for web-based games (chat, image generation, NPC conversations)",
+  "description": "PlayKit SDK for JavaScript",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
   "browser": "dist/index.umd.js",
@@ -34,7 +34,7 @@
     "llm",
     "openai"
   ],
-  "author": "DeveloperWorks",
+  "author": "capsuleer",
   "license": "MIT",
   "repository": {
     "type": "git",

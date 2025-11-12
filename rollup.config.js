@@ -51,6 +51,7 @@ export default [
       name: 'PlayKitSDK',
       sourcemap: true,
       banner,
+      exports: 'named',
       globals: {
         eventemitter3: 'EventEmitter3',
       },
@@ -63,7 +64,7 @@ export default [
         declaration: false,
       }),
     ],
-    external: ['eventemitter3'],
+    external: [],
   },
 
   // Type definitions

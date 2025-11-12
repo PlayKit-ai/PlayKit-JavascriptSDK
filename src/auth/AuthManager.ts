@@ -6,6 +6,7 @@
 import EventEmitter from 'eventemitter3';
 import { AuthState, PlayKitError, SDKConfig } from '../types';
 import { TokenStorage } from './TokenStorage';
+import { AuthFlowManager } from './AuthFlowManager';
 
 const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
 const JWT_EXCHANGE_ENDPOINT = '/api/external/exchange-jwt';
@@ -15,6 +16,7 @@ export class AuthManager extends EventEmitter {
   private authState: AuthState;
   private config: SDKConfig;
   private baseURL: string;
+  private authFlowManager: AuthFlowManager | null = null;
 
   constructor(config: SDKConfig) {
     super();
@@ -73,8 +75,53 @@ export class AuthManager extends EventEmitter {
       return;
     }
 
-    // Not authenticated
+    // Not authenticated - trigger auto-login UI
     this.emit('unauthenticated');
+
+    // Auto-start login flow in browser environment
+    if (typeof window !== 'undefined') {
+      await this.startAuthFlow();
+      // If we reach here, authentication was successful
+      // If it failed, startAuthFlow() will have thrown an error
+    } else {
+      // Node.js environment - cannot show UI, must provide token manually
+      throw new PlayKitError(
+        'No authentication token provided. Please provide developerToken, playerJWT, or call login() manually.',
+        'NOT_AUTHENTICATED'
+      );
+    }
+  }
+
+  /**
+   * Start the authentication flow UI
+   */
+  async startAuthFlow(): Promise<void> {
+    if (this.authFlowManager) {
+      // Already in progress
+      return;
+    }
+
+    try {
+      this.authFlowManager = new AuthFlowManager(this.baseURL);
+
+      // Get global token from auth flow
+      const globalToken = await this.authFlowManager.startFlow();
+
+      // Exchange for player token
+      await this.exchangeJWT(globalToken);
+
+      // Clean up
+      this.authFlowManager.destroy();
+      this.authFlowManager = null;
+    } catch (error) {
+      // User canceled or error occurred
+      this.authFlowManager?.destroy();
+      this.authFlowManager = null;
+
+      // Re-emit error
+      this.emit('error', error);
+      throw error;
+    }
   }
 
   /**
