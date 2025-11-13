@@ -1,6 +1,6 @@
 # PlayKit SDK for JavaScript
 
-[![npm version](https://img.shields.io/npm/v/playkit.svg)](https://www.npmjs.com/package/playkit)
+[![npm version](https://img.shields.io/npm/v/playkit-sdk.svg)](https://www.npmjs.com/package/playkit)
 
 JavaScript/TypeScript SDK for integrating AI capabilities into web-based games.
 

@@ -1,6 +1,6 @@
 {
-  "name": "@agentlandlab/playkit-js",
-  "version": "1.0.0-beta.1",
+  "name": "playkit-sdk",
+  "version": "1.0.0-beta.2",
   "description": "PlayKit SDK for JavaScript",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
