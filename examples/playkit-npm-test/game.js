@@ -7,7 +7,8 @@ let isInitialized = false;
 let snake = [];
 let direction = { x: 1, y: 0 };
 let nextDirection = { x: 1, y: 0 };
-let food = null;
+let foods = []; // 改为数组存储多个食物
+let maxFoods = 10; // 场上最多同时存在的食物数量
 let gridSize = 20;
 let cols, rows;
 let gameArea = { x: 20, y: 80, width: 560, height: 560 };
@@ -26,7 +27,6 @@ const chineseChars = [
 
 // Collected characters
 let collectedChars = [];
-let currentCharOnFood = '';
 
 // Timer
 let gameStartTime = 0;
@@ -58,7 +58,7 @@ function setup() {
 async function initializeSDK() {
   try {
     // Initialize SDK with developer token
-    const gameId = 'your-game-id'; // Replace with actual game ID
+    const gameId = 'ef6eaf4b-39ae-4c76-bcf6-b07541cf0ccc'; // Replace with actual game ID
     const developerToken = 'dev-8d43ba7e-977a-4239-9424-8515d76607e2'; // Replace with actual token
 
     if (gameId === 'your-game-id') {
@@ -75,7 +75,7 @@ async function initializeSDK() {
     // Setup event listeners
     sdk.on('authenticated', () => {
       console.log('SDK authenticated');
-      chatClient = sdk.createChatClient('gpt-4o-mini');
+      chatClient = sdk.createChatClient('gpt-4.1-mini');
       isInitialized = true;
     });
 
@@ -112,20 +112,34 @@ function startGame() {
 
   gameStartTime = millis();
 
-  spawnFood();
+  // 初始化多个食物
+  foods = [];
+  spawnInitialFoods();
 }
 
+// 生成初始的多个食物
+function spawnInitialFoods() {
+  for (let i = 0; i < maxFoods; i++) {
+    spawnFood();
+  }
+}
+
+// 生成一个新食物
 function spawnFood() {
   let validPosition = false;
   let newFood;
+  let attempts = 0;
+  const maxAttempts = 100;
 
-  while (!validPosition) {
+  while (!validPosition && attempts < maxAttempts) {
+    attempts++;
     newFood = {
       x: floor(random(cols)),
-      y: floor(random(rows))
+      y: floor(random(rows)),
+      char: random() < 0.5 ? random(chineseChars) : '' // 50% 概率有汉字
     };
 
-    // Check if food is not on snake
+    // Check if position is not on snake
     validPosition = true;
     for (let segment of snake) {
       if (segment.x === newFood.x && segment.y === newFood.y) {
@@ -133,15 +147,20 @@ function spawnFood() {
         break;
       }
     }
+
+    // Check if position is not on other foods
+    if (validPosition) {
+      for (let food of foods) {
+        if (food.x === newFood.x && food.y === newFood.y) {
+          validPosition = false;
+          break;
+        }
+      }
+    }
   }
 
-  food = newFood;
-
-  // 50% chance to have a Chinese character on the food
-  if (random() < 0.5) {
-    currentCharOnFood = random(chineseChars);
-  } else {
-    currentCharOnFood = '';
+  if (validPosition) {
+    foods.push(newFood);
   }
 }
 
@@ -219,21 +238,27 @@ function drawGame() {
     line(gameArea.x, y, gameArea.x + gameArea.width, y);
   }
 
-  // Draw food
-  if (food) {
+  // Draw all foods
+  for (let food of foods) {
     const fx = gameArea.x + food.x * gridSize;
     const fy = gameArea.y + food.y * gridSize;
 
-    fill(255, 100, 100);
+    // 有汉字的食物用不同颜色显示
+    if (food.char) {
+      fill(255, 150, 50); // 橙色 - 有汉字
+    } else {
+      fill(255, 100, 100); // 红色 - 普通食物
+    }
+
     noStroke();
     circle(fx + gridSize / 2, fy + gridSize / 2, gridSize * 0.8);
 
     // Draw character on food if exists
-    if (currentCharOnFood) {
+    if (food.char) {
       fill(255);
       textSize(16);
       textAlign(CENTER, CENTER);
-      text(currentCharOnFood, fx + gridSize / 2, fy + gridSize / 2);
+      text(food.char, fx + gridSize / 2, fy + gridSize / 2);
     }
   }
 
@@ -404,17 +429,28 @@ function updateSnake() {
   // Add new head
   snake.unshift(head);
 
-  // Check if ate food
-  if (head.x === food.x && head.y === food.y) {
-    // Collect character if exists
-    if (currentCharOnFood) {
-      collectedChars.push(currentCharOnFood);
-    }
+  // Check if ate any food
+  let ateFood = false;
+  for (let i = foods.length - 1; i >= 0; i--) {
+    const food = foods[i];
+    if (head.x === food.x && head.y === food.y) {
+      // Collect character if exists
+      if (food.char) {
+        collectedChars.push(food.char);
+      }
 
-    // Don't remove tail (snake grows)
-    spawnFood();
-  } else {
-    // Remove tail
+      // Remove eaten food
+      foods.splice(i, 1);
+      ateFood = true;
+
+      // Spawn a new food to maintain count
+      spawnFood();
+      break;
+    }
+  }
+
+  if (!ateFood) {
+    // Remove tail (only if didn't eat)
     snake.pop();
   }
 }

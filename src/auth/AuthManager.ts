@@ -7,8 +7,10 @@ import EventEmitter from 'eventemitter3';
 import { AuthState, PlayKitError, SDKConfig } from '../types';
 import { TokenStorage } from './TokenStorage';
 import { AuthFlowManager } from './AuthFlowManager';
+import { ExternalAuthFlowManager } from './ExternalAuthFlowManager';
 
-const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
+// @ts-ignore - replaced at build time
+const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
 const JWT_EXCHANGE_ENDPOINT = '/api/external/exchange-jwt';
 
 export class AuthManager extends EventEmitter {
@@ -17,6 +19,7 @@ export class AuthManager extends EventEmitter {
   private config: SDKConfig;
   private baseURL: string;
   private authFlowManager: AuthFlowManager | null = null;
+  private externalAuthFlowManager: ExternalAuthFlowManager | null = null;
 
   constructor(config: SDKConfig) {
     super();
@@ -80,7 +83,9 @@ export class AuthManager extends EventEmitter {
 
     // Auto-start login flow in browser environment
     if (typeof window !== 'undefined') {
-      await this.startAuthFlow();
+      // Default to external-auth if not specified
+      const useExternalAuth = this.config.authMethod !== 'headless';
+      await this.startAuthFlow(useExternalAuth);
       // If we reach here, authentication was successful
       // If it failed, startAuthFlow() will have thrown an error
     } else {
@@ -94,29 +99,59 @@ export class AuthManager extends EventEmitter {
 
   /**
    * Start the authentication flow UI
+   *
+   * @param useExternalAuth - Use external-auth OAuth flow instead of headless flow
    */
-  async startAuthFlow(): Promise<void> {
-    if (this.authFlowManager) {
+  async startAuthFlow(useExternalAuth: boolean = false): Promise<void> {
+    if (this.authFlowManager || this.externalAuthFlowManager) {
       // Already in progress
       return;
     }
 
     try {
-      this.authFlowManager = new AuthFlowManager(this.baseURL);
+      if (useExternalAuth) {
+        // Use external-auth OAuth popup flow
+        this.externalAuthFlowManager = new ExternalAuthFlowManager(this.baseURL, this.config.gameId);
 
-      // Get global token from auth flow
-      const globalToken = await this.authFlowManager.startFlow();
+        // Get player token directly from external-auth flow
+        const playerToken = await this.externalAuthFlowManager.startFlow();
 
-      // Exchange for player token
-      await this.exchangeJWT(globalToken);
+        // Update auth state with the player token
+        this.authState = {
+          isAuthenticated: true,
+          token: playerToken,
+          tokenType: 'player',
+        };
 
-      // Clean up
-      this.authFlowManager.destroy();
-      this.authFlowManager = null;
+        // Save to storage
+        await this.storage.saveAuthState(this.config.gameId, this.authState);
+        await this.storage.saveSharedToken(playerToken);
+
+        this.emit('authenticated', this.authState);
+
+        // Clean up
+        this.externalAuthFlowManager.destroy();
+        this.externalAuthFlowManager = null;
+      } else {
+        // Use headless verification code flow
+        this.authFlowManager = new AuthFlowManager(this.baseURL);
+
+        // Get global token from auth flow
+        const globalToken = await this.authFlowManager.startFlow();
+
+        // Exchange for player token
+        await this.exchangeJWT(globalToken);
+
+        // Clean up
+        this.authFlowManager.destroy();
+        this.authFlowManager = null;
+      }
     } catch (error) {
       // User canceled or error occurred
       this.authFlowManager?.destroy();
       this.authFlowManager = null;
+      this.externalAuthFlowManager?.destroy();
+      this.externalAuthFlowManager = null;
 
       // Re-emit error
       this.emit('error', error);

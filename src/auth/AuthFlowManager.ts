@@ -58,7 +58,7 @@ type SupportedLanguage = 'en' | 'zh' | 'zh-TW' | 'ja' | 'ko';
 const translations: Record<SupportedLanguage, I18nTranslations> = {
   en: {
     signIn: 'Sign In / Register',
-    signInSubtitle: 'If you don\'t have an account, we\'ll create one for you. Sign up and get free credits!',
+    signInSubtitle: 'This game uses PlayKit for cost management.\nIf you don\'t have an account, we\'ll automatically register you. Sign up and get free AI game credits!',
     email: 'Email',
     phone: 'Phone',
     emailPlaceholder: 'Enter your email address',
@@ -76,7 +76,7 @@ const translations: Record<SupportedLanguage, I18nTranslations> = {
   },
   zh: {
     signIn: '登录/注册',
-    signInSubtitle: '如果您没有帐户，我们会为您自动注册。注册即送积分！',
+    signInSubtitle: '本游戏使用PlayKit进行成本管理。\n如果您没有帐户，我们会为您自动注册。注册即送AI游戏积分！',
     email: '邮箱',
     phone: '手机',
     emailPlaceholder: '请输入邮箱地址',
@@ -94,7 +94,7 @@ const translations: Record<SupportedLanguage, I18nTranslations> = {
   },
   'zh-TW': {
     signIn: '登入/註冊',
-    signInSubtitle: '如果您沒有帳戶，我們會為您自動註冊。註冊即送積分！',
+    signInSubtitle: '本遊戲使用PlayKit進行成本管理。\n如果您沒有帳戶，我們會為您自動註冊。註冊即送AI遊戲積分！',
     email: '電子郵件',
     phone: '手機',
     emailPlaceholder: '請輸入電子郵件地址',
@@ -112,7 +112,7 @@ const translations: Record<SupportedLanguage, I18nTranslations> = {
   },
   ja: {
     signIn: 'サインイン/登録',
-    signInSubtitle: 'アカウントをお持ちでない場合は、自動的に作成します。登録すると無料クレジットがもらえます！',
+    signInSubtitle: 'このゲームはPlayKitでコスト管理を行っています。\nアカウントをお持ちでない場合は、自動的に登録します。登録するとAIゲームクレジットがもらえます！',
     email: 'メール',
     phone: '電話',
     emailPlaceholder: 'メールアドレスを入力してください',
@@ -130,7 +130,7 @@ const translations: Record<SupportedLanguage, I18nTranslations> = {
   },
   ko: {
     signIn: '로그인/가입',
-    signInSubtitle: '계정이 없으시면 자동으로 생성해 드립니다. 가입하면 무료 크레딧을 받으세요！',
+    signInSubtitle: '이 게임은 PlayKit으로 비용 관리를 합니다.\n계정이 없으시면 자동으로 등록해 드립니다. 가입하면 AI 게임 크레딧을 받으세요！',
     email: '이메일',
     phone: '전화',
     emailPlaceholder: '이메일 주소를 입력하세요',
@@ -161,9 +161,10 @@ export class AuthFlowManager extends EventEmitter {
   private verificationPanel: HTMLElement | null = null;
   private loadingOverlay: HTMLElement | null = null;
 
-  constructor(baseURL: string = 'https://playkit.agentlandlab.com') {
+  constructor(baseURL?: string) {
     super();
-    this.baseURL = baseURL;
+    // @ts-ignore - replaced at build time
+    this.baseURL = baseURL || __PLAYKIT_BASE_URL__;
     this.currentLanguage = this.detectLanguage();
   }
 
@@ -668,6 +669,12 @@ export class AuthFlowManager extends EventEmitter {
     codeInputs?.forEach((input, index) => {
       input.addEventListener('input', (e) => {
         const target = e.target as HTMLInputElement;
+
+        // Only allow digits and limit to 1 character
+        const value = target.value.replace(/\D/g, '');
+        target.value = value.slice(0, 1);
+
+        // Move to next input if a digit was entered
         if (target.value.length === 1 && index < codeInputs.length - 1) {
           codeInputs[index + 1].focus();
         }

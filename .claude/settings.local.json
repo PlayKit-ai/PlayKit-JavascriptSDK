@@ -5,7 +5,8 @@
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
       "WebSearch",
-      "WebFetch(domain:baseweb.design)"
+      "WebFetch(domain:baseweb.design)",
+      "Bash(cat:*)"
     ],
     "additionalDirectories": [
       "D:\\Project\\DeveloperWorks-UnitySDK"

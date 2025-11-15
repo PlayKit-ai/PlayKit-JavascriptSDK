@@ -10,7 +10,7 @@ importers:
     dependencies:
       playkit-sdk:
         specifier: latest
-        version: 1.0.0-beta.2
+        version: 1.1.0-beta
     devDependencies:
       http-server:
         specifier: ^14.1.1
@@ -163,8 +163,8 @@ packages:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
     hasBin: true
 
-  playkit-sdk@1.0.0-beta.2:
-    resolution: {integrity: sha512-V6HUjxrDZDQDk3JXCqtyMtgQj5MdX/YxC2O5TlzT0CDSzSZhqInpoysntNq8McdfecoBhR1sz//LXNaCXcSiKQ==}
+  playkit-sdk@1.1.0-beta:
+    resolution: {integrity: sha512-0zUvastJu5aQ62MhGZ70wyh7DyfQyiQ1qCHG4YVPR/dbVuQmY0qzpD4/D2gQq5C8EP1+IBq4SL2ObyFAKg21Sg==}
     engines: {node: '>=14.0.0'}
 
   portfinder@1.0.38:
@@ -356,7 +356,7 @@ snapshots:
 
   opener@1.5.2: {}
 
-  playkit-sdk@1.0.0-beta.2:
+  playkit-sdk@1.1.0-beta:
     dependencies:
       eventemitter3: 5.0.1
 

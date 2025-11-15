@@ -26,6 +26,11 @@ export interface APIResult<T> {
 }
 
 /**
+ * Authentication method type
+ */
+export type AuthMethod = 'headless' | 'external-auth';
+
+/**
  * SDK Configuration options
  */
 export interface SDKConfig {
@@ -40,6 +45,14 @@ export interface SDKConfig {
 
   /** Base URL for API endpoints (optional, defaults to production) */
   baseURL?: string;
+
+  /**
+   * Authentication method to use
+   * - 'headless': Embedded verification code login (for Unity SDK, creates global tokens)
+   * - 'external-auth': OAuth popup flow (for web/WebGL games, creates game-specific tokens)
+   * Default: 'external-auth'
+   */
+  authMethod?: AuthMethod;
 
   /** Default chat model to use */
   defaultChatModel?: string;

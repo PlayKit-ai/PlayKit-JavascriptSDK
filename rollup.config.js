@@ -2,9 +2,15 @@ import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import dts from 'rollup-plugin-dts';
+import replace from '@rollup/plugin-replace';
 import { readFileSync } from 'fs';
 
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
+
+// Get base URL from environment or use default
+const PLAYKIT_BASE_URL = process.env.PLAYKIT_BASE_URL || 'https://playkit.agentlandlab.com';
+
+console.log('[Rollup] Building with PLAYKIT_BASE_URL:', PLAYKIT_BASE_URL);
 
 const banner = `/**
  * ${packageJson.name} v${packageJson.version}
@@ -32,6 +38,12 @@ export default [
       },
     ],
     plugins: [
+      replace({
+        preventAssignment: true,
+        values: {
+          '__PLAYKIT_BASE_URL__': JSON.stringify(PLAYKIT_BASE_URL),
+        },
+      }),
       resolve(),
       commonjs(),
       typescript({
@@ -57,6 +69,12 @@ export default [
       },
     },
     plugins: [
+      replace({
+        preventAssignment: true,
+        values: {
+          '__PLAYKIT_BASE_URL__': JSON.stringify(PLAYKIT_BASE_URL),
+        },
+      }),
       resolve(),
       commonjs(),
       typescript({

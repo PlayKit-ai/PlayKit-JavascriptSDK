@@ -16,6 +16,8 @@ export { PlayerClient } from './core/PlayerClient';
 // Authentication
 export { AuthManager } from './auth/AuthManager';
 export { TokenStorage } from './auth/TokenStorage';
+export { AuthFlowManager } from './auth/AuthFlowManager';
+export { ExternalAuthFlowManager } from './auth/ExternalAuthFlowManager';
 
 // Recharge
 export { RechargeManager } from './recharge/RechargeManager';
