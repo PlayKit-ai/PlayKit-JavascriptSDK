@@ -6,7 +6,8 @@
 import { AuthState } from '../types';
 
 const STORAGE_KEY_PREFIX = 'playkit_';
-const SHARED_TOKEN_KEY = 'playkit_shared_token';
+const SHARED_TOKEN_KEY = 'shared_token';
+const OLD_SHARED_TOKEN_KEY = 'playkit_shared_token'; // For migration
 const ENCRYPTION_KEY_NAME = 'playkit_encryption_key';
 
 export class TokenStorage {
@@ -149,10 +150,33 @@ export class TokenStorage {
 
   /**
    * Load shared token
+   * Includes migration logic from old key name
    */
   async loadSharedToken(): Promise<string | null> {
-    const encrypted = localStorage.getItem(SHARED_TOKEN_KEY);
-    if (!encrypted) return null;
+    // Try to load from new key
+    let encrypted = localStorage.getItem(SHARED_TOKEN_KEY);
+
+    // If not found, try old key for backward compatibility
+    if (!encrypted) {
+      encrypted = localStorage.getItem(OLD_SHARED_TOKEN_KEY);
+      if (encrypted) {
+        // Migrate to new key
+        try {
+          const token = await this.decrypt(encrypted);
+          if (token) {
+            // Save to new key
+            await this.saveSharedToken(token);
+            // Remove old key
+            localStorage.removeItem(OLD_SHARED_TOKEN_KEY);
+            console.log('[PlayKit] Migrated shared token from old key to new key');
+            return token;
+          }
+        } catch (error) {
+          console.error('[PlayKit] Failed to migrate shared token', error);
+        }
+      }
+      return null;
+    }
 
     try {
       return await this.decrypt(encrypted);

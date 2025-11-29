@@ -160,6 +160,7 @@ export class AuthFlowManager extends EventEmitter {
   private identifierPanel: HTMLElement | null = null;
   private verificationPanel: HTMLElement | null = null;
   private loadingOverlay: HTMLElement | null = null;
+  private otpInstance: any = null;
 
   constructor(baseURL?: string) {
     super();
@@ -297,12 +298,12 @@ export class AuthFlowManager extends EventEmitter {
 
           <div class="playkit-auth-input-group">
             <div class="playkit-code-inputs">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="0">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="1">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="2">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="3">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="4">
-              <input type="text" maxlength="1" class="playkit-code-input" data-index="5">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="0">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="1">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="2">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="3">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="4">
+              <input type="number" maxlength="1" class="playkit-code-input" data-index="5">
             </div>
           </div>
 
@@ -320,8 +321,9 @@ export class AuthFlowManager extends EventEmitter {
       </div>
     `;
 
-    // Add styles
+    // Add styles and load VanillaOTP
     this.addStyles();
+    this.loadVanillaOTP();
 
     // Append to body
     document.body.appendChild(this.modal);
@@ -333,6 +335,19 @@ export class AuthFlowManager extends EventEmitter {
 
     // Setup event listeners
     this.setupEventListeners();
+  }
+
+  /**
+   * Load VanillaOTP library
+   */
+  private loadVanillaOTP(): void {
+    // Check if VanillaOTP is already loaded
+    if ((window as any).VanillaOTP) return;
+
+    // Inject VanillaOTP script
+    const script = document.createElement('script');
+    script.textContent = `"use strict";var VanillaOTP=function(t,e=null){if(this.emptyChar=" ","string"==typeof t)this.container=document.querySelector(t);else{if(!(t instanceof Element))return;this.container=t}e&&("string"==typeof e?this.updateTo=document.querySelector(e)||null:e instanceof Element?this.updateTo=e:this.updateTo=null),this.inputs=Array.from(this.container.querySelectorAll("input[type=text], input[type=number], input[type=password]"));let n=this,u=n.inputs.length;for(let i=0;i<u;i++){let l=n.inputs[i];l.addEventListener("input",function(){if(isNaN(l.value))return l.value=l.dataset.otpInputRestore||"",n._updateValue();if(0==l.value.length)return n._saveInputValue(i);if(1==l.value.length){n._saveInputValue(i),n._updateValue(),i+1<u&&n.inputs[i+1].focus();return}if(i==u-1)return n._setInputValue(i,l.value);let t=l.value.split("");for(let e=0;e<t.length&&!(e+i>=u);e++)n._setInputValue(e+i,t[e]);let a=Math.min(u-1,i+t.length);n.inputs[a].focus()}),l.addEventListener("keydown",function(t){if(8==t.keyCode&&""==l.value&&0!=i){n._setInputValue(i-1,""),n.inputs[i-1].focus();return}if(46==t.keyCode&&i!=u-1){let e=l.selectionStart||0;for(let a=i+e;a<u-1;a++)n._setInputValue(a,n.inputs[a+1].value);n._setInputValue(u-1,""),l.selectionStart&&(l.selectionStart=e),t.preventDefault();return}if(37==t.keyCode&&(null==l.selectionStart||0==l.selectionStart)){i>0&&(t.preventDefault(),n.inputs[i-1].focus(),n.inputs[i-1].select());return}if(39==t.keyCode&&(null==l.selectionStart||l.selectionEnd==l.value.length)){i+1<u&&(t.preventDefault(),n.inputs[i+1].focus(),n.inputs[i+1].select());return}})}};VanillaOTP.prototype.setEmptyChar=function(t){this.emptyChar=t},VanillaOTP.prototype.getValue=function(){let t="",e=this;return this.inputs.forEach(function(n){t+=""==n.value?e.emptyChar:n.value}),t},VanillaOTP.prototype.setValue=function(t){if(isNaN(t)){console.error("Please enter an integer value.");return}let e=(t=""+t).split("");for(let n=0;n<this.inputs.length;n++)this._setInputValue(n,e[n]||"")},VanillaOTP.prototype._setInputValue=function(t,e){return isNaN(e)?console.error("Please enter an integer value."):this.inputs[t]?void(this.inputs[t].value=String(e).substring(0,1),this._saveInputValue(t),this._updateValue()):console.error("Index not found.")},VanillaOTP.prototype._saveInputValue=function(t,e){if(!this.inputs[t])return console.error("Index not found.");this.inputs[t].dataset.otpInputRestore=e||this.inputs[t].value},VanillaOTP.prototype._updateValue=function(){this.updateTo&&(this.updateTo.value=this.getValue())};`;
+    document.head.appendChild(script);
   }
 
   /**
@@ -514,6 +529,13 @@ export class AuthFlowManager extends EventEmitter {
         padding: 0 !important;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
         background: #FFFFFF;
+        -moz-appearance: textfield;
+      }
+
+      .playkit-code-input::-webkit-outer-spin-button,
+      .playkit-code-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
       }
 
       .playkit-code-input:hover {
@@ -664,50 +686,24 @@ export class AuthFlowManager extends EventEmitter {
       }
     });
 
-    // Code inputs
-    const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
-    codeInputs?.forEach((input, index) => {
-      input.addEventListener('input', (e) => {
-        const target = e.target as HTMLInputElement;
+    // Initialize VanillaOTP for code inputs
+    const codeInputsContainer = this.modal?.querySelector('.playkit-code-inputs');
+    if (codeInputsContainer && (window as any).VanillaOTP) {
+      this.otpInstance = new (window as any).VanillaOTP(codeInputsContainer);
 
-        // Only allow digits and limit to 1 character
-        const value = target.value.replace(/\D/g, '');
-        target.value = value.slice(0, 1);
-
-        // Move to next input if a digit was entered
-        if (target.value.length === 1 && index < codeInputs.length - 1) {
-          codeInputs[index + 1].focus();
-        }
-
-        // Auto-submit when all 6 digits entered
-        if (index === 5 && target.value.length === 1) {
-          this.onVerifyClicked();
-        }
-      });
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !input.value && index > 0) {
-          codeInputs[index - 1].focus();
-        }
-      });
-
-      // Paste support
-      input.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pastedData = e.clipboardData?.getData('text') || '';
-        const digits = pastedData.replace(/\D/g, '').slice(0, 6);
-
-        digits.split('').forEach((digit, i) => {
-          if (codeInputs[i]) {
-            codeInputs[i].value = digit;
+      // Auto-submit when all 6 digits entered
+      const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
+      codeInputs?.forEach((input, index) => {
+        input.addEventListener('input', () => {
+          // Check if all inputs are filled
+          const allFilled = Array.from(codeInputs).every(inp => inp.value.length === 1);
+          if (allFilled) {
+            // Small delay to ensure the last input is processed
+            setTimeout(() => this.onVerifyClicked(), 100);
           }
         });
-
-        if (digits.length === 6) {
-          this.onVerifyClicked();
-        }
       });
-    });
+    }
 
     // Verify button
     const verifyBtn = document.getElementById('playkit-verify-btn');
@@ -769,10 +765,16 @@ export class AuthFlowManager extends EventEmitter {
   private async onVerifyClicked(): Promise<void> {
     this.clearError('verify');
 
-    const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
-    const code = Array.from(codeInputs).map((input) => input.value).join('');
+    // Get code from VanillaOTP instance or fallback to manual collection
+    let code = '';
+    if (this.otpInstance) {
+      code = this.otpInstance.getValue().replace(/\s/g, ''); // Remove spaces
+    } else {
+      const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
+      code = Array.from(codeInputs).map((input) => input.value).join('');
+    }
 
-    if (code.length !== 6) {
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
       this.showError(this.t('enterAllDigits'), 'verify');
       return;
     }
@@ -876,8 +878,12 @@ export class AuthFlowManager extends EventEmitter {
     if (this.verificationPanel) this.verificationPanel.style.display = 'none';
 
     // Clear code inputs
-    const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
-    codeInputs?.forEach((input) => (input.value = ''));
+    if (this.otpInstance) {
+      this.otpInstance.setValue(''); // Clear all inputs using VanillaOTP
+    } else {
+      const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
+      codeInputs?.forEach((input) => (input.value = ''));
+    }
   }
 
   private showVerificationPanel(): void {

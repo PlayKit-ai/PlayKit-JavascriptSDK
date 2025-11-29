@@ -102,12 +102,28 @@ export class PlayKitSDK extends EventEmitter {
             console.log('[PlayKitSDK] Token validated and user info fetched');
           }
         } catch (error) {
-          // If token is invalid, logout and re-throw error
+          // If token is invalid, logout and restart auth flow
           if (this.config.debug) {
             console.error('[PlayKitSDK] Token validation failed:', error);
           }
           await this.authManager.logout();
-          throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
+
+          // Auto-restart login flow in browser environment
+          if (typeof window !== 'undefined') {
+            if (this.config.debug) {
+              console.log('[PlayKitSDK] Restarting authentication flow...');
+            }
+            const useExternalAuth = this.config.authMethod === 'external-auth';
+            await this.authManager.startAuthFlow(useExternalAuth);
+
+            // Retry getting player info after re-authentication
+            await this.playerClient.getPlayerInfo();
+            if (this.config.debug) {
+              console.log('[PlayKitSDK] Re-authentication successful, token validated');
+            }
+          } else {
+            throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
+          }
         }
       }
 

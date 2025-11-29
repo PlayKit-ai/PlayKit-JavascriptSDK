@@ -59,6 +59,22 @@ export class PlayerClient extends EventEmitter {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to get player info' }));
+
+        // Handle authentication errors (401/403) - token is invalid or expired
+        if (response.status === 401 || response.status === 403) {
+          // Logout and emit event to trigger re-authentication
+          await this.authManager.logout();
+          this.emit('auth_error', {
+            message: 'Token validation failed. Please login again.',
+            status: response.status,
+          });
+          throw new PlayKitError(
+            'Authentication failed. Please login again.',
+            'AUTH_FAILED',
+            response.status
+          );
+        }
+
         throw new PlayKitError(
           error.message || 'Failed to get player info',
           error.code,

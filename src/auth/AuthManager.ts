@@ -48,18 +48,7 @@ export class AuthManager extends EventEmitter {
       return;
     }
 
-    // Try to load saved auth state
-    const savedState = await this.storage.loadAuthState(this.config.gameId);
-    if (savedState && savedState.token) {
-      // Check if token is still valid
-      if (savedState.expiresAt && Date.now() < savedState.expiresAt) {
-        this.authState = savedState;
-        this.emit('authenticated', this.authState);
-        return;
-      }
-    }
-
-    // Try to load shared token
+    // Try to load shared token (cross-game, prioritized like Unity SDK)
     const sharedToken = await this.storage.loadSharedToken();
     if (sharedToken) {
       this.authState = {
@@ -70,6 +59,17 @@ export class AuthManager extends EventEmitter {
       await this.storage.saveAuthState(this.config.gameId, this.authState);
       this.emit('authenticated', this.authState);
       return;
+    }
+
+    // Try to load saved auth state (game-specific fallback)
+    const savedState = await this.storage.loadAuthState(this.config.gameId);
+    if (savedState && savedState.token) {
+      // Check if token is still valid
+      if (savedState.expiresAt && Date.now() < savedState.expiresAt) {
+        this.authState = savedState;
+        this.emit('authenticated', this.authState);
+        return;
+      }
     }
 
     // Check if player JWT was provided
