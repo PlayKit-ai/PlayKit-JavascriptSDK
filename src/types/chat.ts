@@ -2,7 +2,19 @@
  * Chat and text generation types
  */
 
-import { Message } from './common';
+import { Message, ToolCall } from './common';
+
+/**
+ * Tool definition for function calling
+ */
+export interface ChatTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, any>;
+  };
+}
 
 /**
  * Configuration for text generation
@@ -28,6 +40,12 @@ export interface ChatConfig {
 
   /** Top-p sampling */
   topP?: number;
+
+  /** Tools available for the model to use */
+  tools?: ChatTool[];
+
+  /** Tool choice: 'auto', 'required', 'none', or specific tool */
+  tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
 }
 
 /**
@@ -55,7 +73,7 @@ export interface ChatResult {
   model: string;
 
   /** Finish reason */
-  finishReason: 'stop' | 'length' | 'content_filter' | 'null';
+  finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'null';
 
   /** Token usage information */
   usage?: {
@@ -69,6 +87,9 @@ export interface ChatResult {
 
   /** Timestamp of creation */
   created?: number;
+
+  /** Tool calls made by the model */
+  tool_calls?: ToolCall[];
 }
 
 /**
@@ -119,4 +140,98 @@ export interface StreamChunk {
   id?: string;
   delta?: string;
   error?: string;
+}
+
+// ===== NPC Action Types =====
+
+/**
+ * NPC Action parameter types
+ */
+export type NpcActionParamType = 'string' | 'number' | 'boolean' | 'stringEnum';
+
+/**
+ * NPC Action parameter definition
+ */
+export interface NpcActionParameter {
+  name: string;
+  description: string;
+  type: NpcActionParamType;
+  required?: boolean;
+  enumOptions?: string[];
+}
+
+/**
+ * NPC Action definition
+ */
+export interface NpcAction {
+  actionName: string;
+  description: string;
+  parameters?: NpcActionParameter[];
+  enabled?: boolean;
+}
+
+/**
+ * NPC Action call result
+ */
+export interface NpcActionCall {
+  id: string;
+  actionName: string;
+  arguments: Record<string, any>;
+}
+
+/**
+ * Response from NPC with actions
+ */
+export interface NpcActionResponse {
+  text: string;
+  actionCalls: NpcActionCall[];
+  hasActions: boolean;
+}
+
+/**
+ * Helper to convert NpcAction to ChatTool
+ */
+export function npcActionToTool(action: NpcAction): ChatTool {
+  const properties: Record<string, any> = {};
+  const required: string[] = [];
+
+  for (const param of action.parameters || []) {
+    const propDef: Record<string, any> = { description: param.description };
+
+    switch (param.type) {
+      case 'string':
+        propDef.type = 'string';
+        break;
+      case 'number':
+        propDef.type = 'number';
+        break;
+      case 'boolean':
+        propDef.type = 'boolean';
+        break;
+      case 'stringEnum':
+        propDef.type = 'string';
+        if (param.enumOptions?.length) {
+          propDef.enum = param.enumOptions;
+        }
+        break;
+    }
+
+    properties[param.name] = propDef;
+    if (param.required !== false) {
+      required.push(param.name);
+    }
+  }
+
+  return {
+    type: 'function',
+    function: {
+      name: action.actionName,
+      description: action.description,
+      parameters: {
+        type: 'object',
+        properties,
+        required,
+      },
+    },
+  };
 }

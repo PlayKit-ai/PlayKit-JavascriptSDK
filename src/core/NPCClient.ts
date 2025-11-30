@@ -4,7 +4,7 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { Message } from '../types';
+import { Message, ToolCall, NpcAction, NpcActionCall, NpcActionResponse, npcActionToTool } from '../types';
 import { ChatClient } from './ChatClient';
 
 export interface NPCConfig {
@@ -123,8 +123,10 @@ export class NPCClient extends EventEmitter {
 
   /**
    * Talk with structured output
+   * @deprecated Use talkWithActions instead for NPC decision-making with actions
    */
   async talkStructured<T = any>(message: string, schemaName: string): Promise<T> {
+    console.warn('[NPCClient] talkStructured is deprecated. Use talkWithActions instead for NPC decision-making with actions.');
     // Add user message to history
     const userMessage: Message = { role: 'user', content: message };
     this.history.push(userMessage);
@@ -147,6 +149,177 @@ export class NPCClient extends EventEmitter {
     this.trimHistory();
 
     return result;
+  }
+
+  /**
+   * Talk to the NPC with available actions (non-streaming)
+   * @param message The message to send
+   * @param actions List of actions the NPC can perform
+   * @returns Response containing text and any action calls
+   */
+  async talkWithActions(message: string, actions: NpcAction[]): Promise<NpcActionResponse> {
+    // Add user message to history
+    const userMessage: Message = { role: 'user', content: message };
+    this.history.push(userMessage);
+
+    // Convert NpcActions to ChatTools
+    const tools = actions
+      .filter(a => a && a.enabled !== false)
+      .map(a => npcActionToTool(a));
+
+    // Build messages array with system prompt
+    const messages: Message[] = [
+      { role: 'system', content: this.systemPrompt },
+      ...this.history,
+    ];
+
+    // Generate response with tools
+    const result = await this.chatClient.textGenerationWithTools({
+      messages,
+      temperature: this.temperature,
+      tools,
+      tool_choice: 'auto',
+    });
+
+    // Build response
+    const response: NpcActionResponse = {
+      text: result.content || '',
+      actionCalls: [],
+      hasActions: false,
+    };
+
+    // Extract tool calls if any
+    if (result.tool_calls) {
+      response.actionCalls = result.tool_calls.map(tc => ({
+        id: tc.id,
+        actionName: tc.function.name,
+        arguments: this.parseToolArguments(tc.function.arguments),
+      }));
+      response.hasActions = response.actionCalls.length > 0;
+    }
+
+    // Add assistant response to history
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: response.text,
+      tool_calls: result.tool_calls,
+    };
+    this.history.push(assistantMessage);
+
+    this.trimHistory();
+    this.emit('response', response.text);
+    if (response.hasActions) {
+      this.emit('actions', response.actionCalls);
+    }
+
+    return response;
+  }
+
+  /**
+   * Talk to the NPC with actions (streaming)
+   * Text streams first, action calls are returned in onComplete
+   */
+  async talkWithActionsStream(
+    message: string,
+    actions: NpcAction[],
+    onChunk: (chunk: string) => void,
+    onComplete?: (response: NpcActionResponse) => void
+  ): Promise<void> {
+    // Add user message to history
+    const userMessage: Message = { role: 'user', content: message };
+    this.history.push(userMessage);
+
+    // Convert NpcActions to ChatTools
+    const tools = actions
+      .filter(a => a && a.enabled !== false)
+      .map(a => npcActionToTool(a));
+
+    // Build messages array with system prompt
+    const messages: Message[] = [
+      { role: 'system', content: this.systemPrompt },
+      ...this.history,
+    ];
+
+    // Generate response with tools (streaming)
+    await this.chatClient.textGenerationWithToolsStream({
+      messages,
+      temperature: this.temperature,
+      tools,
+      tool_choice: 'auto',
+      onChunk,
+      onComplete: (result) => {
+        // Build response
+        const response: NpcActionResponse = {
+          text: result.content || '',
+          actionCalls: [],
+          hasActions: false,
+        };
+
+        // Extract tool calls if any
+        if (result.tool_calls) {
+          response.actionCalls = result.tool_calls.map(tc => ({
+            id: tc.id,
+            actionName: tc.function.name,
+            arguments: this.parseToolArguments(tc.function.arguments),
+          }));
+          response.hasActions = response.actionCalls.length > 0;
+        }
+
+        // Add assistant response to history
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: response.text,
+          tool_calls: result.tool_calls,
+        };
+        this.history.push(assistantMessage);
+
+        this.trimHistory();
+        this.emit('response', response.text);
+        if (response.hasActions) {
+          this.emit('actions', response.actionCalls);
+        }
+
+        if (onComplete) {
+          onComplete(response);
+        }
+      },
+    });
+  }
+
+  /**
+   * Report action results back to the conversation
+   * Call this after executing actions to let the NPC know the results
+   */
+  reportActionResults(results: Record<string, string>): void {
+    for (const [callId, result] of Object.entries(results)) {
+      this.history.push({
+        role: 'tool',
+        tool_call_id: callId,
+        content: result,
+      });
+    }
+  }
+
+  /**
+   * Report a single action result
+   */
+  reportActionResult(callId: string, result: string): void {
+    this.history.push({
+      role: 'tool',
+      tool_call_id: callId,
+      content: result,
+    });
+  }
+
+  /**
+   * Parse tool arguments from JSON string
+   */
+  private parseToolArguments(args: string): Record<string, any> {
+    try {
+      return JSON.parse(args);
+    } catch {
+      return {};
+    }
   }
 
   /**

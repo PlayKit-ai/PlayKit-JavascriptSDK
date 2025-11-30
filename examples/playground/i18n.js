@@ -33,6 +33,17 @@ const translations = {
     tabTextGen: 'Text Generation',
     tabImageGen: 'Image Generation',
     tabNPC: 'NPC Conversations',
+    tabNPCActions: 'NPC Actions',
+
+    // NPC Actions Tab
+    npcActionsTitle: 'NPC Actions (Tool Calling)',
+    npcActionsDesc: 'Demonstrate NPC decision-making with actions. The NPC can trigger actions like opening a shop, starting a quest, or changing emotions.',
+    presetActions: 'Preset Actions',
+    npcActionsSystemPrompt: 'NPC Character',
+    definedActions: 'Defined Actions',
+    addCustomAction: 'Add Custom Action',
+    createActionsNPC: 'Create NPC with Actions',
+    actionEvents: 'Action Events',
 
     // Text Generation Tab
     textGenTitle: 'Text Generation',
@@ -142,6 +153,17 @@ const translations = {
     tabTextGen: '文本生成',
     tabImageGen: '图像生成',
     tabNPC: 'NPC 对话',
+    tabNPCActions: 'NPC 行动',
+
+    // NPC Actions Tab
+    npcActionsTitle: 'NPC 行动（工具调用）',
+    npcActionsDesc: '演示 NPC 带有行动的决策能力。NPC 可以触发打开商店、开始任务或改变情绪等行动。',
+    presetActions: '预设行动',
+    npcActionsSystemPrompt: 'NPC 角色',
+    definedActions: '已定义行动',
+    addCustomAction: '添加自定义行动',
+    createActionsNPC: '创建带行动的 NPC',
+    actionEvents: '行动事件',
 
     // Text Generation Tab
     textGenTitle: '文本生成',

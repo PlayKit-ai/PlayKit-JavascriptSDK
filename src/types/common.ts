@@ -5,7 +5,19 @@
 /**
  * Message role in a conversation
  */
-export type MessageRole = 'system' | 'user' | 'assistant';
+export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/**
+ * Tool call made by the assistant
+ */
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
 
 /**
  * A message in a conversation
@@ -13,6 +25,10 @@ export type MessageRole = 'system' | 'user' | 'assistant';
 export interface Message {
   role: MessageRole;
   content: string;
+  /** Tool calls made by the assistant (when role is 'assistant') */
+  tool_calls?: ToolCall[];
+  /** Tool call ID this message responds to (when role is 'tool') */
+  tool_call_id?: string;
 }
 
 /**

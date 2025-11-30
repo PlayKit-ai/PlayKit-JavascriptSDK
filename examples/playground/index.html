@@ -182,7 +182,7 @@
         <!-- Tabs -->
         <div class="bg-white rounded-lg shadow">
           <div class="border-b border-gray-200">
-            <nav class="flex -mb-px">
+            <nav class="flex -mb-px flex-wrap">
               <button class="tab-button px-6 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="chat" data-i18n="tabTextGen">
                 Text Generation
               </button>
@@ -191,6 +191,9 @@
               </button>
               <button class="tab-button px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" data-tab="npc" data-i18n="tabNPC">
                 NPC Conversations
+              </button>
+              <button class="tab-button px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" data-tab="npc-actions" data-i18n="tabNPCActions">
+                NPC Actions
               </button>
             </nav>
           </div>
@@ -393,6 +396,133 @@
                   Reset
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Tab Content: NPC Actions -->
+          <div class="tab-content p-6" id="npc-actions-tab">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4" data-i18n="npcActionsTitle">NPC Actions (Tool Calling)</h3>
+            <p class="text-sm text-gray-600 mb-4" data-i18n="npcActionsDesc">
+              Demonstrate NPC decision-making with actions. The NPC can trigger actions like opening a shop, starting a quest, or changing emotions.
+            </p>
+
+            <!-- Preset Actions -->
+            <div class="bg-gray-50 rounded-md p-4 mb-4">
+              <h4 class="text-sm font-semibold text-gray-900 mb-3" data-i18n="presetActions">Preset Actions</h4>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <button id="action-preset-merchant" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-sm font-medium transition-colors">
+                  Merchant NPC
+                </button>
+                <button id="action-preset-quest" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded-full text-sm font-medium transition-colors">
+                  Quest Giver NPC
+                </button>
+                <button id="action-preset-guard" class="bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-full text-sm font-medium transition-colors">
+                  Guard NPC
+                </button>
+              </div>
+
+              <!-- NPC System Prompt for Actions -->
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="npcActionsSystemPrompt">NPC Character</label>
+                <textarea
+                  id="actions-npc-prompt"
+                  rows="2"
+                  placeholder="You are a friendly merchant in a fantasy town..."
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >You are a friendly merchant in a fantasy town. You sell potions, weapons, and armor. You're always looking for good deals and love to haggle.</textarea>
+              </div>
+
+              <!-- Action Definitions -->
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="definedActions">Defined Actions</label>
+                <div id="actions-list" class="space-y-2 max-h-40 overflow-y-auto">
+                  <!-- Actions will be listed here -->
+                </div>
+              </div>
+
+              <!-- Add Custom Action -->
+              <div class="border-t pt-3 mt-3">
+                <h5 class="text-xs font-semibold text-gray-700 mb-2" data-i18n="addCustomAction">Add Custom Action</h5>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <input
+                    type="text"
+                    id="custom-action-name"
+                    placeholder="actionName"
+                    class="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                  <input
+                    type="text"
+                    id="custom-action-desc"
+                    placeholder="Description for AI"
+                    class="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                </div>
+                <button
+                  id="add-custom-action"
+                  class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-3 rounded text-sm transition-colors"
+                >
+                  + Add Action
+                </button>
+              </div>
+            </div>
+
+            <!-- Create Actions NPC Button -->
+            <button
+              id="create-actions-npc"
+              class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:bg-gray-400 mb-4"
+              data-i18n="createActionsNPC"
+              disabled
+            >
+              Create NPC with Actions
+            </button>
+
+            <!-- Actions Conversation Container -->
+            <div id="actions-conversation-container" class="hidden">
+              <!-- Action Events Log -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="actionEvents">Action Events</label>
+                <div id="action-events" class="bg-gray-900 text-green-400 font-mono text-xs p-3 rounded-md h-24 overflow-y-auto">
+                  <p class="text-gray-500"># Action events will appear here...</p>
+                </div>
+              </div>
+
+              <!-- Messages -->
+              <div id="actions-messages" class="bg-gray-50 rounded-md p-4 mb-4 h-64 overflow-y-auto">
+                <p class="text-gray-400 text-sm">Talk to the NPC and watch for actions...</p>
+              </div>
+
+              <!-- Input -->
+              <div class="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  id="actions-input"
+                  placeholder="Talk to the NPC..."
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                <button
+                  id="actions-send"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+
+              <!-- Quick Messages -->
+              <div class="flex flex-wrap gap-2 mt-3">
+                <span class="text-xs text-gray-500">Quick:</span>
+                <button class="quick-action-msg bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs" data-msg="What do you have for sale?">What do you have for sale?</button>
+                <button class="quick-action-msg bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs" data-msg="I'd like to buy a health potion">Buy health potion</button>
+                <button class="quick-action-msg bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs" data-msg="Do you have any quests?">Any quests?</button>
+                <button class="quick-action-msg bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs" data-msg="Goodbye!">Goodbye</button>
+              </div>
+
+              <!-- Reset -->
+              <button
+                id="actions-reset"
+                class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors text-sm"
+              >
+                Reset Conversation
+              </button>
             </div>
           </div>
         </div>
