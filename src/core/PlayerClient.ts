@@ -3,13 +3,14 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { PlayerInfo, PlayKitError, SDKConfig } from '../types';
+import { PlayerInfo, PlayKitError, SDKConfig, SetNicknameResponse } from '../types';
 import { AuthManager } from '../auth/AuthManager';
 import { RechargeManager } from '../recharge/RechargeManager';
 import { RechargeConfig } from '../types/recharge';
 
 const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
 const PLAYER_INFO_ENDPOINT = '/api/external/player-info';
+const SET_NICKNAME_ENDPOINT = '/api/external/set-game-player-nickname';
 
 export class PlayerClient extends EventEmitter {
   private authManager: AuthManager;
@@ -86,6 +87,7 @@ export class PlayerClient extends EventEmitter {
       this.playerInfo = {
         userId: data.userId,
         credits: data.credits,
+        nickname: data.nickname ?? null,
       };
 
       this.emit('player_info_updated', this.playerInfo);
@@ -108,6 +110,87 @@ export class PlayerClient extends EventEmitter {
    */
   async refreshPlayerInfo(): Promise<PlayerInfo> {
     return this.getPlayerInfo();
+  }
+
+  /**
+   * Get player's nickname
+   * Returns the cached nickname from playerInfo, or null if not set
+   */
+  getNickname(): string | null {
+    return this.playerInfo?.nickname ?? null;
+  }
+
+  /**
+   * Set player's nickname for the current game
+   * Requires a game-specific player token (not a global token or developer token)
+   * @param nickname - Nickname to set (1-16 characters, letters/numbers/Chinese/underscores/spaces only)
+   * @returns The set nickname response
+   * @throws PlayKitError if nickname is invalid, moderation fails, or token type is wrong
+   */
+  async setNickname(nickname: string): Promise<SetNicknameResponse> {
+    const token = this.authManager.getToken();
+    if (!token) {
+      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
+    }
+
+    // Developer tokens cannot set nicknames
+    const authState = this.authManager.getAuthState();
+    if (authState.tokenType === 'developer') {
+      throw new PlayKitError(
+        'Developer tokens cannot set nicknames. Use a player token.',
+        'INVALID_TOKEN_TYPE'
+      );
+    }
+
+    // Validate nickname locally first
+    if (!nickname || typeof nickname !== 'string') {
+      throw new PlayKitError('Nickname is required', 'NICKNAME_REQUIRED');
+    }
+
+    const trimmed = nickname.trim();
+    if (trimmed.length === 0) {
+      throw new PlayKitError('Nickname cannot be empty', 'INVALID_NICKNAME');
+    }
+
+    if (trimmed.length > 16) {
+      throw new PlayKitError('Nickname must be 16 characters or less', 'INVALID_NICKNAME');
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}${SET_NICKNAME_ENDPOINT}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: trimmed }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Failed to set nickname' } }));
+        const errorObj = error.error || error;
+
+        throw new PlayKitError(
+          errorObj.message || 'Failed to set nickname',
+          errorObj.code,
+          response.status
+        );
+      }
+
+      const data: SetNicknameResponse = await response.json();
+
+      // Update cached player info with new nickname
+      if (this.playerInfo) {
+        this.playerInfo.nickname = data.nickname;
+        this.emit('player_info_updated', this.playerInfo);
+      }
+
+      this.emit('nickname_changed', data.nickname);
+      return data;
+    } catch (error) {
+      this.emit('error', error);
+      throw error;
+    }
   }
 
   /**

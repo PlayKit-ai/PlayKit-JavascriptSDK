@@ -96,6 +96,24 @@ export interface AuthState {
 export interface PlayerInfo {
   userId: string;
   credits: number;
+  /** Player nickname (per-game nickname > first_name > null) */
+  nickname?: string | null;
+}
+
+/**
+ * Set nickname request
+ */
+export interface SetNicknameRequest {
+  nickname: string;
+}
+
+/**
+ * Set nickname response
+ */
+export interface SetNicknameResponse {
+  success: boolean;
+  nickname: string;
+  gameId: string;
 }
 
 /**
