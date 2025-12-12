@@ -15,7 +15,7 @@ export interface ChatConfigWithTools extends ChatConfig {
   tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
 }
 
-const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
+const DEFAULT_BASE_URL = 'https://playkit.ai';
 
 export class ChatProvider {
   private authManager: AuthManager;
@@ -78,7 +78,7 @@ export class ChatProvider {
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -152,7 +152,7 @@ export class ChatProvider {
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -233,7 +233,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -311,7 +311,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -400,7 +400,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }

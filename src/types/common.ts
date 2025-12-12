@@ -98,6 +98,10 @@ export interface PlayerInfo {
   credits: number;
   /** Player nickname (per-game nickname > first_name > null) */
   nickname?: string | null;
+  /** Developer account balance in RMB (only available for developer tokens) */
+  developerBalance?: number | null;
+  /** Token type: 'developer' | 'player' | 'jwt' */
+  tokenType?: string;
 }
 
 /**

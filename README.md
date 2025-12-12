@@ -229,16 +229,5 @@ This SDK is proprietary software owned by Agentland Lab. Use of this SDK is subj
 
 ## Support
 
-- Email: support@agentlandlab.com
-- Issues: [GitHub Issues](https://github.com/cnqdztp/DeveloperWorks-JavascriptSDK/issues)
-
-## Changelog
-
-### 1.0.0-beta.1
-- Initial public beta release
-- AI chat support (text generation)
-- Image generation support
-- NPC conversation management
-- Authentication and player management
-- Streaming response support
-- Player balance management and recharge functionality
+- Email: support@playkit.ai
+- Issues: [GitHub Issues](https://github.com/PlayKit-ai/PlayKit-JavascriptSDK)

@@ -8,7 +8,7 @@ import { AuthManager } from '../auth/AuthManager';
 import { RechargeManager } from '../recharge/RechargeManager';
 import { RechargeConfig } from '../types/recharge';
 
-const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
+const DEFAULT_BASE_URL = 'https://playkit.ai';
 const PLAYER_INFO_ENDPOINT = '/api/external/player-info';
 const SET_NICKNAME_ENDPOINT = '/api/external/set-game-player-nickname';
 
@@ -28,26 +28,18 @@ export class PlayerClient extends EventEmitter {
       autoShowBalanceModal: rechargeConfig.autoShowBalanceModal ?? true,
       balanceCheckInterval: rechargeConfig.balanceCheckInterval ?? 30000,
       checkBalanceAfterApiCall: rechargeConfig.checkBalanceAfterApiCall ?? true,
-      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.agentlandlab.com/playerPortal/recharge',
+      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.ai/playerPortal/recharge',
     };
   }
 
   /**
    * Get player information
+   * For developer tokens, also returns developerBalance (RMB)
    */
   async getPlayerInfo(): Promise<PlayerInfo> {
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    // If using developer token, return mock player info
-    const authState = this.authManager.getAuthState();
-    if (authState.tokenType === 'developer') {
-      return {
-        userId: 'developer',
-        credits: 999999,
-      };
     }
 
     try {
@@ -88,6 +80,8 @@ export class PlayerClient extends EventEmitter {
         userId: data.userId,
         credits: data.credits,
         nickname: data.nickname ?? null,
+        developerBalance: data.developerBalance ?? null,
+        tokenType: data.tokenType ?? null,
       };
 
       this.emit('player_info_updated', this.playerInfo);

@@ -113,7 +113,7 @@ sdk.on('balance_updated', (credits) => console.log('New balance:', credits));
 
 ## API Models
 
-Ask human to check out available ai models on https://playkit.agentlandlab.com , add more models as they wish
+Ask human to check out available ai models on https://playkit.ai , add more models as they wish
 
 ## Events
 

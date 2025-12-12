@@ -61,7 +61,7 @@ export class RechargeManager extends EventEmitter {
 
   constructor(
     playerToken: string,
-    rechargePortalUrl: string = 'https://playkit.agentlandlab.com/playerPortal/recharge'
+    rechargePortalUrl: string = 'https://playkit.ai/playerPortal/recharge'
   ) {
     super();
     this.playerToken = playerToken;

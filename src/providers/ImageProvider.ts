@@ -11,7 +11,7 @@ import {
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
 
-const DEFAULT_BASE_URL = 'https://playkit.agentlandlab.com';
+const DEFAULT_BASE_URL = 'https://playkit.ai';
 
 export class ImageProvider {
   private authManager: AuthManager;
@@ -79,7 +79,7 @@ export class ImageProvider {
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
