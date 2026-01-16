@@ -13,11 +13,24 @@ export type ImageSize =
   | '1024x1792';
 
 /**
+ * Input image for img2img generation
+ */
+export interface ImageInput {
+  /** Base64-encoded image data (without data URL prefix) */
+  data: string;
+  /** Optional media type (e.g., 'image/png', 'image/jpeg') */
+  mediaType?: string;
+}
+
+/**
  * Configuration for image generation
  */
 export interface ImageGenerationConfig {
-  /** Text prompt for image generation */
-  prompt: string;
+  /** Text prompt for image generation (required for text-to-image, optional for img2img) */
+  prompt?: string;
+
+  /** Input images for img2img generation */
+  images?: ImageInput[];
 
   /** Image size */
   size?: ImageSize;
@@ -36,13 +49,16 @@ export interface ImageGenerationConfig {
 
   /** Style setting (vivid or natural) */
   style?: 'vivid' | 'natural';
+
+  /** If true, automatically remove background from generated images */
+  transparent?: boolean;
 }
 
 /**
  * Generated image result
  */
 export interface GeneratedImage {
-  /** Base64-encoded image data */
+  /** Base64-encoded image data (background removed if transparent=true and successful) */
   base64: string;
 
   /** Original prompt used */
@@ -56,6 +72,12 @@ export interface GeneratedImage {
 
   /** Image size */
   size?: ImageSize;
+
+  /** Original image before background removal (only present when transparent=true) */
+  originalBase64?: string;
+
+  /** Whether background removal was successful (only present when transparent=true) */
+  transparentSuccess?: boolean;
 
   /** Converts base64 to data URL */
   toDataURL(): string;
@@ -73,5 +95,9 @@ export interface ImageGenerationResponse {
     b64_json?: string;
     url?: string;
     revised_prompt?: string;
+    /** Original image before background removal (only present when transparent=true) */
+    b64_json_original?: string;
+    /** Whether background removal was successful (only present when transparent=true) */
+    transparent_success?: boolean;
   }>;
 }

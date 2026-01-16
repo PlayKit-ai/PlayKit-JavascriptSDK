@@ -6,8 +6,6 @@
 import { AuthState } from '../types';
 
 const STORAGE_KEY_PREFIX = 'playkit_';
-const SHARED_TOKEN_KEY = 'shared_token';
-const OLD_SHARED_TOKEN_KEY = 'playkit_shared_token'; // For migration
 const ENCRYPTION_KEY_NAME = 'playkit_encryption_key';
 
 export class TokenStorage {
@@ -83,7 +81,7 @@ export class TokenStorage {
     combined.set(iv, 0);
     combined.set(new Uint8Array(encrypted), iv.length);
 
-    return this.arrayBufferToBase64(combined);
+    return this.arrayBufferToBase64(combined.buffer);
   }
 
   /**
@@ -141,52 +139,6 @@ export class TokenStorage {
   }
 
   /**
-   * Save shared token (accessible by all DeveloperWorks games)
-   */
-  async saveSharedToken(token: string): Promise<void> {
-    const encrypted = await this.encrypt(token);
-    localStorage.setItem(SHARED_TOKEN_KEY, encrypted);
-  }
-
-  /**
-   * Load shared token
-   * Includes migration logic from old key name
-   */
-  async loadSharedToken(): Promise<string | null> {
-    // Try to load from new key
-    let encrypted = localStorage.getItem(SHARED_TOKEN_KEY);
-
-    // If not found, try old key for backward compatibility
-    if (!encrypted) {
-      encrypted = localStorage.getItem(OLD_SHARED_TOKEN_KEY);
-      if (encrypted) {
-        // Migrate to new key
-        try {
-          const token = await this.decrypt(encrypted);
-          if (token) {
-            // Save to new key
-            await this.saveSharedToken(token);
-            // Remove old key
-            localStorage.removeItem(OLD_SHARED_TOKEN_KEY);
-            console.log('[PlayKit] Migrated shared token from old key to new key');
-            return token;
-          }
-        } catch (error) {
-          console.error('[PlayKit] Failed to migrate shared token', error);
-        }
-      }
-      return null;
-    }
-
-    try {
-      return await this.decrypt(encrypted);
-    } catch (error) {
-      console.error('Failed to load shared token', error);
-      return null;
-    }
-  }
-
-  /**
    * Clear auth state for a game
    */
   clearAuthState(gameId: string): void {
@@ -195,18 +147,11 @@ export class TokenStorage {
   }
 
   /**
-   * Clear shared token
-   */
-  clearSharedToken(): void {
-    localStorage.removeItem(SHARED_TOKEN_KEY);
-  }
-
-  /**
    * Clear all PlayKit data
    */
   clearAll(): void {
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith(STORAGE_KEY_PREFIX) || key === SHARED_TOKEN_KEY) {
+      if (key.startsWith(STORAGE_KEY_PREFIX)) {
         localStorage.removeItem(key);
       }
     });

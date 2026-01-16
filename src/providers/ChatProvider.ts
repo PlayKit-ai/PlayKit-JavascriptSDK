@@ -46,7 +46,7 @@ export class ChatProvider {
     }
 
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v1/chat`;
+    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
     const requestBody = {
       model,
@@ -78,7 +78,7 @@ export class ChatProvider {
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -120,7 +120,7 @@ export class ChatProvider {
     }
 
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v1/chat`;
+    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
     const requestBody = {
       model,
@@ -152,7 +152,7 @@ export class ChatProvider {
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -194,7 +194,7 @@ export class ChatProvider {
     }
 
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v1/chat`;
+    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
     const requestBody: Record<string, any> = {
       model,
@@ -233,7 +233,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -272,7 +272,7 @@ export class ChatProvider {
     }
 
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v1/chat`;
+    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
     const requestBody: Record<string, any> = {
       model,
@@ -311,7 +311,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -343,22 +343,28 @@ export class ChatProvider {
   /**
    * Generate structured output using JSON schema
    * Uses the /chat endpoint with response_format for structured output
+   * @param schemaName Name of the schema
+   * @param prompt Text prompt for generation
+   * @param model Model to use
+   * @param temperature Temperature for generation
+   * @param schema Optional JSON schema (if not provided, uses schemaName as reference)
+   * @param schemaDescription Optional description of the schema
    */
-  async generateStructured(
+  async generateStructured<T = any>(
     schemaName: string,
     prompt: string,
     model?: string,
     temperature?: number,
     schema?: Record<string, any>,
     schemaDescription?: string
-  ): Promise<any> {
+  ): Promise<T> {
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
     }
 
     const modelToUse = model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v1/chat`;
+    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
     const messages = [{ role: 'user' as const, content: prompt }];
 
@@ -400,7 +406,7 @@ export class ChatProvider {
           response.status
         );
 
-        if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'PLAYER_INSUFFICIENT_CREDIT' || error.code === 'INSUFFICIENT_DEVELOPER_BALANCE' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }

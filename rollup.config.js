@@ -8,7 +8,7 @@ import { readFileSync } from 'fs';
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 // Get base URL from environment or use default
-const PLAYKIT_BASE_URL = process.env.PLAYKIT_BASE_URL || 'https://playkit.ai';
+const PLAYKIT_BASE_URL = process.env.PLAYKIT_BASE_URL || 'https://api.playkit.ai';
 
 console.log('[Rollup] Building with PLAYKIT_BASE_URL:', PLAYKIT_BASE_URL);
 

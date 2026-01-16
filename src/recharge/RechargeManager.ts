@@ -7,41 +7,41 @@ import { RechargeModalOptions } from '../types/recharge';
 const translations = {
   en: {
     title: 'Insufficient Balance',
-    message: 'You don\'t have enough Spark! Come back tomorrow to receive new Spark, or you can recharge now.',
+    message: 'Your balance is insufficient. Please recharge to continue.',
     currentBalance: 'Current Balance',
-    credits: 'Spark',
+    credits: '',  // No longer using "Spark", display USD amount directly
     rechargeButton: 'Recharge Now',
     cancelButton: 'Cancel',
   },
   zh: {
     title: '余额不足',
-    message: '您的Spark不够啦！明天再来就能领到新的Spark，或者也可以现在充值。',
+    message: '您的余额不足，请充值后继续使用。',
     currentBalance: '当前余额',
-    credits: 'Spark',
+    credits: '',  // 不再使用"Spark"，直接显示美元金额
     rechargeButton: '立即充值',
     cancelButton: '取消',
   },
   'zh-TW': {
     title: '餘額不足',
-    message: '您的Spark不夠啦！明天再來就能領到新的Spark，或者也可以現在充值。',
+    message: '您的餘額不足，請充值後繼續使用。',
     currentBalance: '當前餘額',
-    credits: 'Spark',
+    credits: '',  // 不再使用"Spark"，直接顯示美元金額
     rechargeButton: '立即充值',
     cancelButton: '取消',
   },
   ja: {
     title: '残高不足',
-    message: 'Sparkが足りません！明日また来れば新しいSparkがもらえます。今すぐチャージすることもできます。',
+    message: '残高が不足しています。チャージしてください。',
     currentBalance: '現在の残高',
-    credits: 'Spark',
+    credits: '',  // "Spark"は使用しません、USD金額を直接表示
     rechargeButton: '今すぐチャージ',
     cancelButton: 'キャンセル',
   },
   ko: {
     title: '잔액 부족',
-    message: 'Spark가 부족합니다! 내일 다시 오시면 새로운 Spark를 받을 수 있으며, 지금 충전하실 수도 있습니다.',
+    message: '잔액이 부족합니다. 충전 후 이용해 주세요.',
     currentBalance: '현재 잔액',
-    credits: 'Spark',
+    credits: '',  // "Spark" 사용 안 함, USD 금액 직접 표시
     rechargeButton: '지금 충전',
     cancelButton: '취소',
   },
@@ -55,17 +55,20 @@ type SupportedLanguage = keyof typeof translations;
 export class RechargeManager extends EventEmitter {
   private playerToken: string;
   private rechargePortalUrl: string;
+  private gameId?: string;
   private language: SupportedLanguage;
   private modalContainer: HTMLDivElement | null = null;
   private styleElement: HTMLStyleElement | null = null;
 
   constructor(
     playerToken: string,
-    rechargePortalUrl: string = 'https://playkit.ai/playerPortal/recharge'
+    rechargePortalUrl: string = 'https://playkit.ai/recharge',
+    gameId?: string
   ) {
     super();
     this.playerToken = playerToken;
     this.rechargePortalUrl = rechargePortalUrl;
+    this.gameId = gameId;
     this.language = this.detectLanguage();
   }
 
@@ -96,10 +99,15 @@ export class RechargeManager extends EventEmitter {
   }
 
   /**
-   * Build recharge URL with player token
+   * Build recharge URL with player token and gameId
    */
   public buildRechargeUrl(): string {
-    return `${this.rechargePortalUrl}?playerToken=${encodeURIComponent(this.playerToken)}`;
+    let url = `${this.rechargePortalUrl}?playerToken=${encodeURIComponent(this.playerToken)}`;
+    // Add gameId to URL so recharge page can fetch correct owner's wallet
+    if (this.gameId) {
+      url += `&gameId=${encodeURIComponent(this.gameId)}`;
+    }
+    return url;
   }
 
   /**
@@ -134,14 +142,16 @@ export class RechargeManager extends EventEmitter {
       };
 
       // Add event listeners for dismiss
-      const cancelButton = this.modalContainer?.querySelector('.playkit-recharge-cancel');
+      // Cast to HTMLDivElement since createModal() sets this.modalContainer
+      const container = this.modalContainer as unknown as HTMLDivElement;
+      const cancelButton = container.querySelector('.playkit-recharge-cancel');
       if (cancelButton) {
         cancelButton.addEventListener('click', cleanup);
       }
 
-      const overlay = this.modalContainer?.querySelector('.playkit-recharge-overlay');
+      const overlay = container.querySelector('.playkit-recharge-overlay');
       if (overlay) {
-        overlay.addEventListener('click', (e) => {
+        overlay.addEventListener('click', (e: Event) => {
           if (e.target === overlay) {
             cleanup();
           }

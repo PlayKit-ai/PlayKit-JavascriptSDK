@@ -1,14 +1,47 @@
 /**
  * NPC Client for simplified conversation management
  * Automatically handles conversation history
+ * 
+ * Key Features:
+ * - Call talk() for all interactions - actions are handled automatically
+ * - Memory system for persistent NPC context
+ * - Reply prediction for suggesting player responses
+ * - Automatic conversation history management
  */
 
 import EventEmitter from 'eventemitter3';
-import { Message, ToolCall, NpcAction, NpcActionCall, NpcActionResponse, npcActionToTool } from '../types';
+import { Message, NpcAction, NpcActionResponse, npcActionToTool } from '../types';
 import { ChatClient } from './ChatClient';
 
+/**
+ * Memory entry for NPC context
+ */
+export interface MemoryEntry {
+  name: string;
+  content: string;
+}
+
+/**
+ * Data structure for saving and loading conversation history
+ */
+export interface ConversationSaveData {
+  /** @deprecated Use characterDesign instead */
+  systemPrompt?: string;
+  characterDesign: string;
+  memories: MemoryEntry[];
+  history: Message[];
+}
+
 export interface NPCConfig {
-  /** System prompt defining the NPC's personality */
+  /** 
+   * Character design/system prompt for this NPC
+   * Preferred over systemPrompt
+   */
+  characterDesign?: string;
+
+  /** 
+   * @deprecated Use characterDesign instead 
+   */
   systemPrompt?: string;
 
   /** Model to use for the NPC */
@@ -19,67 +52,368 @@ export interface NPCConfig {
 
   /** Maximum number of messages to keep in history */
   maxHistoryLength?: number;
+
+  /** Automatically generate player reply predictions after NPC responds */
+  generateReplyPrediction?: boolean;
+
+  /** Number of reply predictions to generate (2-6, default: 4) */
+  predictionCount?: number;
+
+  /** Fast model to use for predictions (optional, uses default if not set) */
+  fastModel?: string;
 }
 
 export class NPCClient extends EventEmitter {
   private chatClient: ChatClient;
-  private systemPrompt: string;
+  private characterDesign: string;
+  private memories: Map<string, string>;
   private history: Message[];
   private temperature: number;
   private maxHistoryLength: number;
+  private generateReplyPrediction: boolean;
+  private predictionCount: number;
+  private fastModel?: string;
+  private _isTalking: boolean = false;
 
   constructor(chatClient: ChatClient, config?: NPCConfig) {
     super();
     this.chatClient = chatClient;
-    this.systemPrompt = config?.systemPrompt || 'You are a helpful assistant.';
+    // Support both characterDesign and legacy systemPrompt
+    this.characterDesign = config?.characterDesign || config?.systemPrompt || 'You are a helpful assistant.';
     this.temperature = config?.temperature ?? 0.7;
     this.maxHistoryLength = config?.maxHistoryLength || 50;
+    this.generateReplyPrediction = config?.generateReplyPrediction ?? false;
+    this.predictionCount = Math.max(2, Math.min(6, config?.predictionCount ?? 4));
+    this.fastModel = config?.fastModel;
     this.history = [];
+    this.memories = new Map();
+  }
+
+  // ===== State Properties =====
+
+  /**
+   * Whether the NPC is currently processing a request
+   */
+  get isTalking(): boolean {
+    return this._isTalking;
+  }
+
+  // ===== Character Design & Memory System =====
+
+  /**
+   * Set the character design for the NPC.
+   * The system prompt is composed of CharacterDesign + all Memories.
+   */
+  setCharacterDesign(design: string): void {
+    this.characterDesign = design;
   }
 
   /**
-   * Set the system prompt (NPC personality)
+   * Get the current character design
+   */
+  getCharacterDesign(): string {
+    return this.characterDesign;
+  }
+
+  /**
+   * @deprecated Use setCharacterDesign instead.
+   * This method is kept for backwards compatibility.
    */
   setSystemPrompt(prompt: string): void {
-    this.systemPrompt = prompt;
+    console.warn('[NPCClient] setSystemPrompt is deprecated. Use setCharacterDesign instead.');
+    this.setCharacterDesign(prompt);
   }
 
   /**
-   * Get the current system prompt
+   * @deprecated Use getCharacterDesign instead.
+   * This method is kept for backwards compatibility.
    */
   getSystemPrompt(): string {
-    return this.systemPrompt;
+    return this.buildSystemPrompt();
   }
+
+  /**
+   * Set or update a memory for the NPC.
+   * Memories are appended to the character design to form the system prompt.
+   * Set memoryContent to null or empty to remove the memory.
+   * @param memoryName The name/key of the memory
+   * @param memoryContent The content of the memory. Null or empty to remove.
+   */
+  setMemory(memoryName: string, memoryContent: string | null): void {
+    if (!memoryName) {
+      console.warn('[NPCClient] Memory name cannot be empty');
+      return;
+    }
+
+    if (!memoryContent) {
+      // Remove memory if content is null or empty
+      if (this.memories.has(memoryName)) {
+        this.memories.delete(memoryName);
+        this.emit('memory_removed', memoryName);
+      }
+    } else {
+      // Add or update memory
+      this.memories.set(memoryName, memoryContent);
+      this.emit('memory_set', memoryName, memoryContent);
+    }
+  }
+
+  /**
+   * Get a specific memory by name.
+   * @param memoryName The name of the memory to retrieve
+   * @returns The memory content, or undefined if not found
+   */
+  getMemory(memoryName: string): string | undefined {
+    return this.memories.get(memoryName);
+  }
+
+  /**
+   * Get all memory names currently stored.
+   * @returns Array of memory names
+   */
+  getMemoryNames(): string[] {
+    return Array.from(this.memories.keys());
+  }
+
+  /**
+   * Clear all memories (but keep character design).
+   */
+  clearMemories(): void {
+    this.memories.clear();
+    this.emit('memories_cleared');
+  }
+
+  /**
+   * Build the complete system prompt from CharacterDesign + Memories.
+   */
+  private buildSystemPrompt(): string {
+    const parts: string[] = [];
+
+    if (this.characterDesign) {
+      parts.push(this.characterDesign);
+    }
+
+    if (this.memories.size > 0) {
+      const memoryStrings = Array.from(this.memories.entries())
+        .map(([name, content]) => `[${name}]: ${content}`);
+      parts.push('Memories:\n' + memoryStrings.join('\n'));
+    }
+
+    return parts.join('\n\n');
+  }
+
+  // ===== Reply Prediction =====
+
+  /**
+   * Enable or disable automatic reply prediction
+   */
+  setGenerateReplyPrediction(enabled: boolean): void {
+    this.generateReplyPrediction = enabled;
+  }
+
+  /**
+   * Set the number of predictions to generate
+   */
+  setPredictionCount(count: number): void {
+    this.predictionCount = Math.max(2, Math.min(6, count));
+  }
+
+  /**
+   * Manually generate reply predictions based on current conversation.
+   * Uses the fast model for quick generation.
+   * @param count Number of predictions to generate (default: uses predictionCount property)
+   * @returns Array of predicted player replies, or empty array on failure
+   */
+  async generateReplyPredictions(count?: number): Promise<string[]> {
+    const predictionNum = count ?? this.predictionCount;
+
+    if (this.history.length < 2) {
+      console.log('[NPCClient] Not enough conversation history to generate predictions');
+      return [];
+    }
+
+    try {
+      // Get last NPC message
+      const lastNpcMessage = [...this.history]
+        .reverse()
+        .find(m => m.role === 'assistant')?.content;
+
+      if (!lastNpcMessage) {
+        console.log('[NPCClient] No NPC message found to generate predictions from');
+        return [];
+      }
+
+      // Build recent history (last 6 non-system messages)
+      const recentHistory = this.history
+        .filter(m => m.role !== 'system')
+        .slice(-6)
+        .map(m => `${m.role}: ${m.content}`);
+
+      // Build prompt for prediction generation
+      const prompt = `Based on the conversation history below, generate exactly ${predictionNum} natural and contextually appropriate responses that the player might say next.
+
+Context:
+- This is a conversation between a player and an NPC in a game
+- The NPC just said: "${lastNpcMessage}"
+
+Conversation history:
+${recentHistory.join('\n')}
+
+Requirements:
+1. Each response should be 1-2 sentences maximum
+2. Responses should be diverse in tone and intent
+3. Include a mix of questions, statements, and action-oriented responses
+4. Responses should feel natural for a player character
+
+Output ONLY a JSON array of ${predictionNum} strings, nothing else:
+["response1", "response2", "response3", "response4"]`;
+
+      const result = await this.chatClient.textGeneration({
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.8,
+        model: this.fastModel,
+      });
+
+      if (!result.content) {
+        console.warn('[NPCClient] Failed to generate predictions: empty response');
+        return [];
+      }
+
+      // Parse JSON response
+      const predictions = this.parsePredictionsFromJson(result.content, predictionNum);
+
+      if (predictions.length > 0) {
+        this.emit('replyPredictions', predictions);
+      }
+
+      return predictions;
+    } catch (error) {
+      console.error('[NPCClient] Error generating predictions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse predictions from JSON array response
+   */
+  private parsePredictionsFromJson(response: string, expectedCount: number): string[] {
+    try {
+      // Try to find JSON array in response
+      const startIndex = response.indexOf('[');
+      const endIndex = response.lastIndexOf(']');
+
+      if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+        console.warn('[NPCClient] Could not find JSON array in prediction response');
+        return this.extractPredictionsFromText(response, expectedCount);
+      }
+
+      const jsonArray = response.substring(startIndex, endIndex + 1);
+      const parsed = JSON.parse(jsonArray);
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(item => typeof item === 'string' && item.trim())
+          .slice(0, expectedCount);
+      }
+
+      return [];
+    } catch (error) {
+      console.warn('[NPCClient] Failed to parse predictions JSON:', error);
+      return this.extractPredictionsFromText(response, expectedCount);
+    }
+  }
+
+  /**
+   * Fallback: Extract predictions from text when JSON parsing fails
+   */
+  private extractPredictionsFromText(response: string, expectedCount: number): string[] {
+    const predictions: string[] = [];
+    const lines = response.split(/[\n\r]+/).filter(line => line.trim());
+
+    for (const line of lines) {
+      let cleaned = line.trim();
+
+      // Skip empty lines and JSON brackets
+      if (!cleaned || cleaned === '[' || cleaned === ']') continue;
+
+      // Remove common prefixes like "1.", "- ", etc.
+      if (/^\d+\./.test(cleaned)) {
+        cleaned = cleaned.replace(/^\d+\.\s*/, '');
+      } else if (cleaned.startsWith('- ')) {
+        cleaned = cleaned.substring(2);
+      }
+
+      // Remove surrounding quotes
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = cleaned.slice(1, -1);
+      }
+
+      // Remove trailing comma
+      if (cleaned.endsWith(',')) {
+        cleaned = cleaned.slice(0, -1).trim();
+      }
+
+      if (cleaned && predictions.length < expectedCount) {
+        predictions.push(cleaned);
+      }
+    }
+
+    return predictions;
+  }
+
+  /**
+   * Internal method to trigger prediction generation after NPC response
+   */
+  private async triggerReplyPrediction(): Promise<void> {
+    if (!this.generateReplyPrediction) return;
+
+    // Fire and forget - don't block the main response
+    this.generateReplyPredictions().catch(err => {
+      console.error('[NPCClient] Background prediction generation failed:', err);
+    });
+  }
+
+  // ===== Main API - Talk Methods =====
 
   /**
    * Talk to the NPC (non-streaming)
    */
   async talk(message: string): Promise<string> {
-    // Add user message to history
-    const userMessage: Message = { role: 'user', content: message };
-    this.history.push(userMessage);
+    this._isTalking = true;
 
-    // Build messages array with system prompt
-    const messages: Message[] = [
-      { role: 'system', content: this.systemPrompt },
-      ...this.history,
-    ];
+    try {
+      // Add user message to history
+      const userMessage: Message = { role: 'user', content: message };
+      this.history.push(userMessage);
 
-    // Generate response
-    const result = await this.chatClient.textGeneration({
-      messages,
-      temperature: this.temperature,
-    });
+      // Build messages array with system prompt
+      const messages: Message[] = [
+        { role: 'system', content: this.buildSystemPrompt() },
+        ...this.history,
+      ];
 
-    // Add assistant response to history
-    const assistantMessage: Message = { role: 'assistant', content: result.content };
-    this.history.push(assistantMessage);
+      // Generate response
+      const result = await this.chatClient.textGeneration({
+        messages,
+        temperature: this.temperature,
+      });
 
-    // Trim history if needed
-    this.trimHistory();
+      // Add assistant response to history
+      const assistantMessage: Message = { role: 'assistant', content: result.content };
+      this.history.push(assistantMessage);
 
-    this.emit('response', result.content);
-    return result.content;
+      // Trim history if needed
+      this.trimHistory();
+
+      this.emit('response', result.content);
+
+      // Trigger reply prediction generation (fire and forget)
+      this.triggerReplyPrediction();
+
+      return result.content;
+    } finally {
+      this._isTalking = false;
+    }
   }
 
   /**
@@ -90,35 +424,48 @@ export class NPCClient extends EventEmitter {
     onChunk: (chunk: string) => void,
     onComplete?: (fullText: string) => void
   ): Promise<void> {
-    // Add user message to history
-    const userMessage: Message = { role: 'user', content: message };
-    this.history.push(userMessage);
+    this._isTalking = true;
 
-    // Build messages array with system prompt
-    const messages: Message[] = [
-      { role: 'system', content: this.systemPrompt },
-      ...this.history,
-    ];
+    try {
+      // Add user message to history
+      const userMessage: Message = { role: 'user', content: message };
+      this.history.push(userMessage);
 
-    // Generate response
-    await this.chatClient.textGenerationStream({
-      messages,
-      temperature: this.temperature,
-      onChunk,
-      onComplete: (fullText) => {
-        // Add assistant response to history
-        const assistantMessage: Message = { role: 'assistant', content: fullText };
-        this.history.push(assistantMessage);
+      // Build messages array with system prompt
+      const messages: Message[] = [
+        { role: 'system', content: this.buildSystemPrompt() },
+        ...this.history,
+      ];
 
-        // Trim history if needed
-        this.trimHistory();
+      // Generate response
+      await this.chatClient.textGenerationStream({
+        messages,
+        temperature: this.temperature,
+        onChunk,
+        onComplete: (fullText) => {
+          this._isTalking = false;
 
-        this.emit('response', fullText);
-        if (onComplete) {
-          onComplete(fullText);
-        }
-      },
-    });
+          // Add assistant response to history
+          const assistantMessage: Message = { role: 'assistant', content: fullText };
+          this.history.push(assistantMessage);
+
+          // Trim history if needed
+          this.trimHistory();
+
+          this.emit('response', fullText);
+
+          // Trigger reply prediction generation (fire and forget)
+          this.triggerReplyPrediction();
+
+          if (onComplete) {
+            onComplete(fullText);
+          }
+        },
+      });
+    } catch (error) {
+      this._isTalking = false;
+      throw error;
+    }
   }
 
   /**
@@ -135,7 +482,7 @@ export class NPCClient extends EventEmitter {
     const result = await this.chatClient.generateStructured<T>({
       schemaName,
       prompt: message,
-      messages: [{ role: 'system', content: this.systemPrompt }, ...this.history],
+      messages: [{ role: 'system', content: this.buildSystemPrompt() }, ...this.history],
       temperature: this.temperature,
     });
 
@@ -158,61 +505,70 @@ export class NPCClient extends EventEmitter {
    * @returns Response containing text and any action calls
    */
   async talkWithActions(message: string, actions: NpcAction[]): Promise<NpcActionResponse> {
-    // Add user message to history
-    const userMessage: Message = { role: 'user', content: message };
-    this.history.push(userMessage);
+    this._isTalking = true;
 
-    // Convert NpcActions to ChatTools
-    const tools = actions
-      .filter(a => a && a.enabled !== false)
-      .map(a => npcActionToTool(a));
+    try {
+      // Add user message to history
+      const userMessage: Message = { role: 'user', content: message };
+      this.history.push(userMessage);
 
-    // Build messages array with system prompt
-    const messages: Message[] = [
-      { role: 'system', content: this.systemPrompt },
-      ...this.history,
-    ];
+      // Convert NpcActions to ChatTools
+      const tools = actions
+        .filter(a => a && a.enabled !== false)
+        .map(a => npcActionToTool(a));
 
-    // Generate response with tools
-    const result = await this.chatClient.textGenerationWithTools({
-      messages,
-      temperature: this.temperature,
-      tools,
-      tool_choice: 'auto',
-    });
+      // Build messages array with system prompt
+      const messages: Message[] = [
+        { role: 'system', content: this.buildSystemPrompt() },
+        ...this.history,
+      ];
 
-    // Build response
-    const response: NpcActionResponse = {
-      text: result.content || '',
-      actionCalls: [],
-      hasActions: false,
-    };
+      // Generate response with tools
+      const result = await this.chatClient.textGenerationWithTools({
+        messages,
+        temperature: this.temperature,
+        tools,
+        tool_choice: 'auto',
+      });
 
-    // Extract tool calls if any
-    if (result.tool_calls) {
-      response.actionCalls = result.tool_calls.map(tc => ({
-        id: tc.id,
-        actionName: tc.function.name,
-        arguments: this.parseToolArguments(tc.function.arguments),
-      }));
-      response.hasActions = response.actionCalls.length > 0;
+      // Build response
+      const response: NpcActionResponse = {
+        text: result.content || '',
+        actionCalls: [],
+        hasActions: false,
+      };
+
+      // Extract tool calls if any
+      if (result.tool_calls) {
+        response.actionCalls = result.tool_calls.map(tc => ({
+          id: tc.id,
+          actionName: tc.function.name,
+          arguments: this.parseToolArguments(tc.function.arguments),
+        }));
+        response.hasActions = response.actionCalls.length > 0;
+      }
+
+      // Add assistant response to history
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: response.text,
+        tool_calls: result.tool_calls,
+      };
+      this.history.push(assistantMessage);
+
+      this.trimHistory();
+      this.emit('response', response.text);
+      if (response.hasActions) {
+        this.emit('actions', response.actionCalls);
+      }
+
+      // Trigger reply prediction generation (fire and forget)
+      this.triggerReplyPrediction();
+
+      return response;
+    } finally {
+      this._isTalking = false;
     }
-
-    // Add assistant response to history
-    const assistantMessage: Message = {
-      role: 'assistant',
-      content: response.text,
-      tool_calls: result.tool_calls,
-    };
-    this.history.push(assistantMessage);
-
-    this.trimHistory();
-    this.emit('response', response.text);
-    if (response.hasActions) {
-      this.emit('actions', response.actionCalls);
-    }
-
-    return response;
   }
 
   /**
@@ -225,66 +581,80 @@ export class NPCClient extends EventEmitter {
     onChunk: (chunk: string) => void,
     onComplete?: (response: NpcActionResponse) => void
   ): Promise<void> {
-    // Add user message to history
-    const userMessage: Message = { role: 'user', content: message };
-    this.history.push(userMessage);
+    this._isTalking = true;
 
-    // Convert NpcActions to ChatTools
-    const tools = actions
-      .filter(a => a && a.enabled !== false)
-      .map(a => npcActionToTool(a));
+    try {
+      // Add user message to history
+      const userMessage: Message = { role: 'user', content: message };
+      this.history.push(userMessage);
 
-    // Build messages array with system prompt
-    const messages: Message[] = [
-      { role: 'system', content: this.systemPrompt },
-      ...this.history,
-    ];
+      // Convert NpcActions to ChatTools
+      const tools = actions
+        .filter(a => a && a.enabled !== false)
+        .map(a => npcActionToTool(a));
 
-    // Generate response with tools (streaming)
-    await this.chatClient.textGenerationWithToolsStream({
-      messages,
-      temperature: this.temperature,
-      tools,
-      tool_choice: 'auto',
-      onChunk,
-      onComplete: (result) => {
-        // Build response
-        const response: NpcActionResponse = {
-          text: result.content || '',
-          actionCalls: [],
-          hasActions: false,
-        };
+      // Build messages array with system prompt
+      const messages: Message[] = [
+        { role: 'system', content: this.buildSystemPrompt() },
+        ...this.history,
+      ];
 
-        // Extract tool calls if any
-        if (result.tool_calls) {
-          response.actionCalls = result.tool_calls.map(tc => ({
-            id: tc.id,
-            actionName: tc.function.name,
-            arguments: this.parseToolArguments(tc.function.arguments),
-          }));
-          response.hasActions = response.actionCalls.length > 0;
-        }
+      // Generate response with tools (streaming)
+      await this.chatClient.textGenerationWithToolsStream({
+        messages,
+        temperature: this.temperature,
+        tools,
+        tool_choice: 'auto',
+        onChunk,
+        onComplete: (result) => {
+          this._isTalking = false;
 
-        // Add assistant response to history
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: response.text,
-          tool_calls: result.tool_calls,
-        };
-        this.history.push(assistantMessage);
+          // Build response
+          const response: NpcActionResponse = {
+            text: result.content || '',
+            actionCalls: [],
+            hasActions: false,
+          };
 
-        this.trimHistory();
-        this.emit('response', response.text);
-        if (response.hasActions) {
-          this.emit('actions', response.actionCalls);
-        }
+          // Extract tool calls if any
+          if (result.tool_calls) {
+            response.actionCalls = result.tool_calls.map(tc => ({
+              id: tc.id,
+              actionName: tc.function.name,
+              arguments: this.parseToolArguments(tc.function.arguments),
+            }));
+            response.hasActions = response.actionCalls.length > 0;
+          }
 
-        if (onComplete) {
-          onComplete(response);
-        }
-      },
-    });
+          // Add assistant response to history
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: response.text,
+            tool_calls: result.tool_calls,
+          };
+          this.history.push(assistantMessage);
+
+          this.trimHistory();
+          this.emit('response', response.text);
+          if (response.hasActions) {
+            this.emit('actions', response.actionCalls);
+          }
+
+          // Trigger reply prediction generation (fire and forget)
+          this.triggerReplyPrediction();
+
+          if (onComplete) {
+            onComplete(response);
+          }
+        },
+      });
+    } catch (error) {
+      this._isTalking = false;
+      throw error;
+    }
   }
+
+  // ===== Action Results Reporting =====
 
   /**
    * Report action results back to the conversation
@@ -322,6 +692,8 @@ export class NPCClient extends EventEmitter {
     }
   }
 
+  // ===== Conversation History Management =====
+
   /**
    * Get conversation history
    */
@@ -330,7 +702,15 @@ export class NPCClient extends EventEmitter {
   }
 
   /**
-   * Clear conversation history
+   * Get the number of messages in history
+   */
+  getHistoryLength(): number {
+    return this.history.length;
+  }
+
+  /**
+   * Clear conversation history.
+   * The character design and memories will be preserved.
    */
   clearHistory(): void {
     this.history = [];
@@ -338,33 +718,57 @@ export class NPCClient extends EventEmitter {
   }
 
   /**
-   * Save history to JSON string
+   * Revert the last exchange (user message and assistant response) from history.
+   * @returns true if reverted, false if not enough history
    */
-  saveHistory(): string {
-    return JSON.stringify({
-      systemPrompt: this.systemPrompt,
-      history: this.history,
-    });
+  revertHistory(): boolean {
+    let lastAssistantIndex = -1;
+    let lastUserIndex = -1;
+
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      if (this.history[i].role === 'assistant' && lastAssistantIndex === -1) {
+        lastAssistantIndex = i;
+      } else if (this.history[i].role === 'user' && lastAssistantIndex !== -1 && lastUserIndex === -1) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+
+    if (lastAssistantIndex !== -1 && lastUserIndex !== -1) {
+      // Remove in reverse order to maintain indices
+      this.history.splice(lastAssistantIndex, 1);
+      this.history.splice(lastUserIndex, 1);
+      this.emit('history_reverted');
+      return true;
+    }
+
+    return false;
   }
 
   /**
-   * Load history from JSON string
+   * Revert (remove) the last N chat messages from history
+   * @param count Number of messages to remove
+   * @returns Number of messages actually removed
    */
-  loadHistory(saveData: string): boolean {
-    try {
-      const data = JSON.parse(saveData);
-      this.systemPrompt = data.systemPrompt || this.systemPrompt;
-      this.history = data.history || [];
-      this.emit('history_loaded');
-      return true;
-    } catch (error) {
-      console.error('Failed to load history', error);
-      return false;
+  revertChatMessages(count: number): number {
+    if (count <= 0) return 0;
+
+    const messagesToRemove = Math.min(count, this.history.length);
+    const originalCount = this.history.length;
+
+    this.history = this.history.slice(0, -messagesToRemove);
+
+    const actuallyRemoved = originalCount - this.history.length;
+    if (actuallyRemoved > 0) {
+      this.emit('history_reverted', actuallyRemoved);
     }
+
+    return actuallyRemoved;
   }
 
   /**
    * Revert to a specific point in history
+   * @deprecated Use revertHistory() or revertChatMessages() instead
    */
   revertToMessage(index: number): void {
     if (index >= 0 && index < this.history.length) {
@@ -382,6 +786,17 @@ export class NPCClient extends EventEmitter {
   }
 
   /**
+   * Alias for appendMessage (Unity SDK compatibility)
+   */
+  appendChatMessage(role: string, content: string): void {
+    if (!role || !content) {
+      console.warn('[NPCClient] Role and content cannot be empty');
+      return;
+    }
+    this.appendMessage({ role: role as any, content });
+  }
+
+  /**
    * Trim history to max length
    */
   private trimHistory(): void {
@@ -391,10 +806,50 @@ export class NPCClient extends EventEmitter {
     }
   }
 
+  // ===== Save/Load =====
+
   /**
-   * Get the number of messages in history
+   * Save the current conversation history to a serializable format.
+   * Includes characterDesign, memories, and history.
    */
-  getHistoryLength(): number {
-    return this.history.length;
+  saveHistory(): string {
+    const saveData: ConversationSaveData = {
+      characterDesign: this.characterDesign,
+      memories: Array.from(this.memories.entries()).map(([name, content]) => ({ name, content })),
+      history: this.history,
+    };
+    return JSON.stringify(saveData);
+  }
+
+  /**
+   * Load conversation history from serialized data.
+   * Restores characterDesign, memories, and history.
+   */
+  loadHistory(saveData: string): boolean {
+    try {
+      const data = JSON.parse(saveData) as Partial<ConversationSaveData>;
+      
+      // Load character design (with backwards compatibility for old systemPrompt field)
+      this.characterDesign = data.characterDesign || data.systemPrompt || this.characterDesign;
+      
+      // Load memories
+      this.memories.clear();
+      if (data.memories && Array.isArray(data.memories)) {
+        for (const memory of data.memories) {
+          if (memory.name && memory.content) {
+            this.memories.set(memory.name, memory.content);
+          }
+        }
+      }
+
+      // Load history (skip system messages as they'll be rebuilt from characterDesign + memories)
+      this.history = (data.history || []).filter(m => m.role !== 'system');
+      
+      this.emit('history_loaded');
+      return true;
+    } catch (error) {
+      console.error('[NPCClient] Failed to load history:', error);
+      return false;
+    }
   }
 }

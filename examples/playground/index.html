@@ -12,7 +12,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
 
   <!-- PlayKit SDK -->
-  <script src="https://unpkg.com/playkit-sdk/dist/playkit-sdk.umd.js"></script>
+  <script src="../../dist/playkit-sdk.umd.js?v=11"></script>
 
   <style>
     body {
@@ -220,13 +220,51 @@
               <label for="chat-streaming" class="text-sm text-gray-600" data-i18n="enableStreaming">Enable Streaming</label>
             </div>
 
+            <!-- Temperature Control -->
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                <span data-i18n="temperature">Temperature</span>: <span id="temperature-value" class="text-blue-600 font-semibold">0.7</span>
+              </label>
+              <input
+                type="range"
+                id="chat-temperature"
+                min="0"
+                max="2"
+                step="0.1"
+                value="0.7"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              >
+              <div class="flex justify-between text-xs text-gray-500 mt-1">
+                <span data-i18n="tempPrecise">Precise (0)</span>
+                <span data-i18n="tempBalanced">Balanced (1)</span>
+                <span data-i18n="tempCreative">Creative (2)</span>
+              </div>
+            </div>
+
             <!-- Messages Container -->
             <div id="chat-messages" class="bg-gray-50 rounded-md p-4 mb-4 h-96 overflow-y-auto">
               <p class="text-gray-400 text-sm" data-i18n="messagesPlaceholder">Messages will appear here...</p>
             </div>
 
+            <!-- Multimodal Image Attachments -->
+            <div id="chat-attachments" class="hidden mb-2">
+              <div class="flex flex-wrap gap-2" id="chat-attachment-previews"></div>
+            </div>
+
             <!-- Input -->
             <div class="flex gap-2 mb-2">
+              <!-- Image Upload Button -->
+              <input type="file" id="chat-image-input" accept="image/*" class="hidden" multiple>
+              <button
+                type="button"
+                onclick="document.getElementById('chat-image-input').click()"
+                class="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                title="Attach image"
+              >
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+              </button>
               <input
                 type="text"
                 id="chat-input"
@@ -263,6 +301,21 @@
             <!-- Image Size -->
             <div class="mb-4">
               <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="imageSize">Image Size</label>
+              <!-- Size Preset Buttons -->
+              <div class="flex flex-wrap gap-2 mb-2">
+                <button onclick="setImageSize('1024x1024')" class="size-preset-btn px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-blue-50 hover:border-blue-500 transition-colors" data-size="1024x1024">
+                  <span data-i18n="imageSizeSquare">1024x1024 (Square)</span>
+                </button>
+                <button onclick="setImageSize('1792x1024')" class="size-preset-btn px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-blue-50 hover:border-blue-500 transition-colors" data-size="1792x1024">
+                  <span data-i18n="imageSizeLandscape">1792x1024 (Landscape)</span>
+                </button>
+                <button onclick="setImageSize('1024x1792')" class="size-preset-btn px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-blue-50 hover:border-blue-500 transition-colors" data-size="1024x1792">
+                  <span data-i18n="imageSizePortrait">1024x1792 (Portrait)</span>
+                </button>
+                <button onclick="setImageSize('512x512')" class="size-preset-btn px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-blue-50 hover:border-blue-500 transition-colors" data-size="512x512">
+                  <span data-i18n="imageSizeSmall">512x512 (Small)</span>
+                </button>
+              </div>
               <input
                 type="text"
                 id="image-size"
@@ -270,7 +323,6 @@
                 placeholder="1024x1024"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               >
-              <p class="text-xs text-gray-500 mt-1">e.g., 1024x1024, 1792x1024, 512x512</p>
             </div>
 
             <!-- Prompt -->
@@ -283,6 +335,45 @@
                 placeholder="A beautiful sunset over the ocean..."
                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               ></textarea>
+            </div>
+
+            <!-- img2img Input -->
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="img2imgInput">Input Image (img2img)</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="file"
+                  id="img2img-input"
+                  accept="image/*"
+                  class="hidden"
+                >
+                <button
+                  type="button"
+                  onclick="document.getElementById('img2img-input').click()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors"
+                >
+                  <span data-i18n="selectImage">Select Image</span>
+                </button>
+                <span id="img2img-filename" class="text-sm text-gray-500" data-i18n="noImageSelected">No image selected</span>
+                <button
+                  type="button"
+                  id="img2img-clear"
+                  onclick="clearImg2imgInput()"
+                  class="hidden px-2 py-1 text-red-500 hover:text-red-700 text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+              <img id="img2img-preview" class="hidden mt-2 max-h-32 rounded-md border border-gray-200" />
+            </div>
+
+            <!-- Options Row -->
+            <div class="mb-4 flex items-center gap-4">
+              <!-- Transparent Background Toggle -->
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="image-transparent" class="w-4 h-4 text-blue-600 rounded">
+                <span class="text-sm text-gray-700" data-i18n="transparentBg">Transparent Background</span>
+              </label>
             </div>
 
             <button
@@ -302,6 +393,19 @@
 
             <!-- P5.js Canvas Container -->
             <div id="p5-canvas-container" class="flex justify-center"></div>
+
+            <!-- Download Button -->
+            <div id="image-download-container" class="flex justify-center mt-4 hidden">
+              <button
+                id="download-image-btn"
+                class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-md transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span data-i18n="downloadImage">Download Image</span>
+              </button>
+            </div>
 
             <!-- Generated Images Grid -->
             <div id="image-gallery" class="grid grid-cols-2 gap-4 mt-4"></div>

@@ -8,25 +8,59 @@ export { PlayKitSDK } from './core/PlayKitSDK';
 
 // Core clients
 export { ChatClient } from './core/ChatClient';
+export type {
+  ChatWithToolsConfig,
+  ChatWithToolsStreamConfig,
+  StructuredGenerationConfig,
+  StructuredResult,
+} from './core/ChatClient';
 export { ImageClient } from './core/ImageClient';
+export { TranscriptionClient } from './core/TranscriptionClient';
 export { NPCClient } from './core/NPCClient';
-export type { NPCConfig } from './core/NPCClient';
+export type { NPCConfig, ConversationSaveData, MemoryEntry } from './core/NPCClient';
 export { PlayerClient } from './core/PlayerClient';
+
+// Schema Library
+export { SchemaLibrary, defaultSchemaLibrary } from './core/SchemaLibrary';
+export type { SchemaEntry } from './core/SchemaLibrary';
+
+// AI Context Manager
+export { AIContextManager, defaultContextManager } from './core/AIContextManager';
+export type { AIContextManagerConfig, AIContextManagerEvents } from './core/AIContextManager';
 
 // Authentication
 export { AuthManager } from './auth/AuthManager';
 export { TokenStorage } from './auth/TokenStorage';
+/**
+ * @deprecated Use DeviceAuthFlowManager instead. Will be removed in v2.0
+ */
 export { AuthFlowManager } from './auth/AuthFlowManager';
-export { ExternalAuthFlowManager } from './auth/ExternalAuthFlowManager';
+export { DeviceAuthFlowManager } from './auth/DeviceAuthFlowManager';
+export type {
+  DeviceAuthFlowOptions,
+  DeviceAuthResult,
+  TokenScope,
+} from './auth/DeviceAuthFlowManager';
 
 // Recharge
 export { RechargeManager } from './recharge/RechargeManager';
+
+// Helper functions
+export {
+  createTextMessage,
+  createMultimodalMessage,
+} from './types/common';
 
 // Types
 export type {
   // Common types
   Message,
   MessageRole,
+  MessageContent,
+  MessageContentPart,
+  TextContentPart,
+  ImageContentPart,
+  AudioContentPart,
   APIResult,
   SDKConfig,
   AuthState,
@@ -41,9 +75,15 @@ export type {
   StreamChunk,
   // Image types
   ImageSize,
+  ImageInput,
   ImageGenerationConfig,
   GeneratedImage,
   ImageGenerationResponse,
+  // Transcription types
+  TranscriptionConfig,
+  TranscriptionOptions,
+  TranscriptionResult,
+  TranscriptionSegment,
 } from './types';
 
 // Recharge types

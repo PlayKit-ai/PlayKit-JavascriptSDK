@@ -2,7 +2,7 @@
  * Image generation client
  */
 
-import { GeneratedImage, ImageGenerationConfig, ImageSize } from '../types';
+import { GeneratedImage, ImageGenerationConfig, ImageSize, ImageInput } from '../types';
 import { ImageProvider } from '../providers/ImageProvider';
 
 /**
@@ -14,18 +14,24 @@ class GeneratedImageImpl implements GeneratedImage {
   revisedPrompt?: string;
   generatedAt: number;
   size?: ImageSize;
+  originalBase64?: string;
+  transparentSuccess?: boolean;
 
   constructor(
     base64: string,
     originalPrompt: string,
     revisedPrompt?: string,
-    size?: ImageSize
+    size?: ImageSize,
+    originalBase64?: string,
+    transparentSuccess?: boolean
   ) {
     this.base64 = base64;
     this.originalPrompt = originalPrompt;
     this.revisedPrompt = revisedPrompt;
     this.generatedAt = Date.now();
     this.size = size;
+    this.originalBase64 = originalBase64;
+    this.transparentSuccess = transparentSuccess;
   }
 
   toDataURL(): string {
@@ -72,7 +78,9 @@ export class ImageClient {
       imageData.b64_json,
       config.prompt,
       imageData.revised_prompt,
-      config.size
+      config.size,
+      imageData.b64_json_original,
+      imageData.transparent_success
     );
   }
 
@@ -99,7 +107,9 @@ export class ImageClient {
         imageData.b64_json,
         config.prompt,
         imageData.revised_prompt,
-        config.size
+        config.size,
+        imageData.b64_json_original,
+        imageData.transparent_success
       );
     });
   }
@@ -109,5 +119,54 @@ export class ImageClient {
    */
   async generate(prompt: string, size?: ImageSize): Promise<GeneratedImage> {
     return this.generateImage({ prompt, size });
+  }
+
+  /**
+   * Image-to-image generation
+   * @param images - Input images (base64 encoded)
+   * @param prompt - Optional prompt to guide the generation
+   * @param options - Additional generation options
+   */
+  async img2img(
+    images: ImageInput[],
+    prompt?: string,
+    options?: Omit<ImageGenerationConfig, 'images' | 'prompt' | 'n'>
+  ): Promise<GeneratedImage> {
+    return this.generateImage({
+      images,
+      prompt,
+      ...options,
+    });
+  }
+
+  /**
+   * Convert a data URL to ImageInput format
+   * @param dataUrl - Data URL (e.g., 'data:image/png;base64,...')
+   */
+  static dataUrlToImageInput(dataUrl: string): ImageInput {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) {
+      throw new Error('Invalid data URL format');
+    }
+    return {
+      mediaType: match[1],
+      data: match[2],
+    };
+  }
+
+  /**
+   * Convert a File/Blob to ImageInput format (browser only)
+   * @param file - File or Blob object
+   */
+  static async fileToImageInput(file: Blob): Promise<ImageInput> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(ImageClient.dataUrlToImageInput(result));
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
   }
 }

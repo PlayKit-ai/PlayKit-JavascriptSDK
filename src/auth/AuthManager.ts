@@ -7,7 +7,7 @@ import EventEmitter from 'eventemitter3';
 import { AuthState, PlayKitError, SDKConfig } from '../types';
 import { TokenStorage } from './TokenStorage';
 import { AuthFlowManager } from './AuthFlowManager';
-import { ExternalAuthFlowManager } from './ExternalAuthFlowManager';
+import { DeviceAuthFlowManager, DeviceAuthFlowOptions, DeviceAuthResult } from './DeviceAuthFlowManager';
 
 // @ts-ignore - replaced at build time
 const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
@@ -19,7 +19,7 @@ export class AuthManager extends EventEmitter {
   private config: SDKConfig;
   private baseURL: string;
   private authFlowManager: AuthFlowManager | null = null;
-  private externalAuthFlowManager: ExternalAuthFlowManager | null = null;
+  private deviceAuthFlowManager: DeviceAuthFlowManager | null = null;
 
   constructor(config: SDKConfig) {
     super();
@@ -48,20 +48,7 @@ export class AuthManager extends EventEmitter {
       return;
     }
 
-    // Try to load shared token (cross-game, prioritized like Unity SDK)
-    const sharedToken = await this.storage.loadSharedToken();
-    if (sharedToken) {
-      this.authState = {
-        isAuthenticated: true,
-        token: sharedToken,
-        tokenType: 'player',
-      };
-      await this.storage.saveAuthState(this.config.gameId, this.authState);
-      this.emit('authenticated', this.authState);
-      return;
-    }
-
-    // Try to load saved auth state (game-specific fallback)
+    // Try to load saved auth state (game-specific)
     const savedState = await this.storage.loadAuthState(this.config.gameId);
     if (savedState && savedState.token) {
       // Check if token is still valid
@@ -83,9 +70,9 @@ export class AuthManager extends EventEmitter {
 
     // Auto-start login flow in browser environment
     if (typeof window !== 'undefined') {
-      // Default to external-auth if not specified
-      const useExternalAuth = this.config.authMethod == 'external-auth';
-      await this.startAuthFlow(useExternalAuth);
+      // Default to device auth if not specified
+      const authMethod = this.config.authMethod || 'device';
+      await this.startAuthFlow(authMethod);
       // If we reach here, authentication was successful
       // If it failed, startAuthFlow() will have thrown an error
     } else {
@@ -100,38 +87,48 @@ export class AuthManager extends EventEmitter {
   /**
    * Start the authentication flow UI
    *
-   * @param useExternalAuth - Use external-auth OAuth flow instead of headless flow
+   * @param authMethod - Authentication method to use ('device' or 'headless')
+   * @deprecated 'headless' authentication is deprecated and will be removed in v2.0. Use 'device' instead.
    */
-  async startAuthFlow(useExternalAuth: boolean = false): Promise<void> {
-    if (this.authFlowManager || this.externalAuthFlowManager) {
+  async startAuthFlow(authMethod: 'device' | 'headless' = 'device'): Promise<void> {
+    if (this.authFlowManager || this.deviceAuthFlowManager) {
       // Already in progress
       return;
     }
 
-    try {
-      if (useExternalAuth) {
-        // Use external-auth OAuth popup flow
-        this.externalAuthFlowManager = new ExternalAuthFlowManager(this.baseURL, this.config.gameId);
+    // Deprecation warning for headless auth
+    if (authMethod === 'headless') {
+      console.warn(
+        '[PlayKit] "headless" authentication is deprecated and will be removed in v2.0. ' +
+        'Please migrate to "device" authentication.'
+      );
+    }
 
-        // Get player token directly from external-auth flow
-        const playerToken = await this.externalAuthFlowManager.startFlow();
+    try {
+      if (authMethod === 'device') {
+        // Use Device Authorization flow (recommended)
+        this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
+
+        const result = await this.deviceAuthFlowManager.startFlow({
+          scope: 'player:play',
+        });
 
         // Update auth state with the player token
         this.authState = {
           isAuthenticated: true,
-          token: playerToken,
+          token: result.access_token,
           tokenType: 'player',
+          expiresAt: Date.now() + result.expires_in * 1000,
         };
 
         // Save to storage
         await this.storage.saveAuthState(this.config.gameId, this.authState);
-        await this.storage.saveSharedToken(playerToken);
 
         this.emit('authenticated', this.authState);
 
         // Clean up
-        this.externalAuthFlowManager.destroy();
-        this.externalAuthFlowManager = null;
+        this.deviceAuthFlowManager.destroy();
+        this.deviceAuthFlowManager = null;
       } else {
         // Use headless verification code flow
         this.authFlowManager = new AuthFlowManager(this.baseURL);
@@ -150,8 +147,8 @@ export class AuthManager extends EventEmitter {
       // User canceled or error occurred
       this.authFlowManager?.destroy();
       this.authFlowManager = null;
-      this.externalAuthFlowManager?.destroy();
-      this.externalAuthFlowManager = null;
+      this.deviceAuthFlowManager?.destroy();
+      this.deviceAuthFlowManager = null;
 
       // Re-emit error
       this.emit('error', error);
@@ -202,7 +199,6 @@ export class AuthManager extends EventEmitter {
 
       // Save to storage
       await this.storage.saveAuthState(this.config.gameId, this.authState);
-      await this.storage.saveSharedToken(playerToken);
 
       this.emit('authenticated', this.authState);
       return playerToken;
@@ -257,5 +253,62 @@ export class AuthManager extends EventEmitter {
    */
   clearAll(): void {
     this.storage.clearAll();
+  }
+
+  /**
+   * Start the Device Authorization Flow
+   * Best for desktop apps, CLI tools, Unity Editor, or environments without browser popups
+   *
+   * @param options - Device auth flow options
+   * @returns Promise resolving to DeviceAuthResult with tokens
+   *
+   * @example
+   * ```ts
+   * const result = await authManager.startDeviceAuthFlow({
+   *   scope: 'player:play',
+   *   onAuthUrl: (url) => console.log('Please open:', url),
+   *   onPollStatus: (status) => console.log('Status:', status),
+   * });
+   * console.log('Access token:', result.access_token);
+   * ```
+   */
+  async startDeviceAuthFlow(options: DeviceAuthFlowOptions = {}): Promise<DeviceAuthResult> {
+    if (this.deviceAuthFlowManager) {
+      throw new PlayKitError('Device auth flow already in progress', 'FLOW_IN_PROGRESS');
+    }
+
+    try {
+      this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
+
+      const result = await this.deviceAuthFlowManager.startFlow(options);
+
+      // Update auth state with the token
+      this.authState = {
+        isAuthenticated: true,
+        token: result.access_token,
+        tokenType: result.scope === 'developer:full' ? 'developer' : 'player',
+        expiresAt: Date.now() + result.expires_in * 1000,
+      };
+
+      // Save to storage
+      await this.storage.saveAuthState(this.config.gameId, this.authState);
+
+      this.emit('authenticated', this.authState);
+
+      return result;
+    } finally {
+      // Clean up
+      this.deviceAuthFlowManager?.destroy();
+      this.deviceAuthFlowManager = null;
+    }
+  }
+
+  /**
+   * Cancel ongoing device auth flow
+   */
+  cancelDeviceAuthFlow(): void {
+    if (this.deviceAuthFlowManager) {
+      this.deviceAuthFlowManager.cancel();
+    }
   }
 }

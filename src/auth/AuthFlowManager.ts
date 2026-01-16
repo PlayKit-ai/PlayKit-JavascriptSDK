@@ -1,6 +1,9 @@
 /**
  * Authentication Flow Manager
  * Manages the headless authentication flow with automatic UI
+ *
+ * @deprecated This class is deprecated. Use DeviceAuthFlowManager instead.
+ * Will be removed in v2.0
  */
 
 import EventEmitter from 'eventemitter3';
@@ -651,7 +654,7 @@ export class AuthFlowManager extends EventEmitter {
     const emailRadio = this.modal?.querySelector('input[value="email"]') as HTMLInputElement;
     const phoneRadio = this.modal?.querySelector('input[value="phone"]') as HTMLInputElement;
     const identifierInput = document.getElementById('playkit-identifier-input') as HTMLInputElement;
-    const identifierIcon = document.getElementById('playkit-identifier-icon') as SVGElement;
+    const identifierIcon = document.getElementById('playkit-identifier-icon') as unknown as SVGElement;
 
     const updateIcon = () => {
       const isEmail = emailRadio?.checked;

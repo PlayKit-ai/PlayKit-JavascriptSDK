@@ -5,6 +5,9 @@ let imageClient = null;
 let npcs = new Map(); // Map<name, NPCClient>
 let currentNPC = null;
 let p5Instance = null;
+let lastGeneratedImage = null; // Store last generated image for download
+let img2imgData = null; // Store img2img input image
+let chatAttachments = []; // Store chat image attachments
 
 // NPC Actions state
 let actionsNPC = null;
@@ -29,10 +32,15 @@ const elements = {
   // Chat
   chatSystemPrompt: document.getElementById('chat-system-prompt'),
   chatStreaming: document.getElementById('chat-streaming'),
+  chatTemperature: document.getElementById('chat-temperature'),
+  temperatureValue: document.getElementById('temperature-value'),
   chatMessages: document.getElementById('chat-messages'),
   chatInput: document.getElementById('chat-input'),
   chatSend: document.getElementById('chat-send'),
   chatClear: document.getElementById('chat-clear'),
+  chatImageInput: document.getElementById('chat-image-input'),
+  chatAttachments: document.getElementById('chat-attachments'),
+  chatAttachmentPreviews: document.getElementById('chat-attachment-previews'),
 
   // Image
   imageSize: document.getElementById('image-size'),
@@ -41,6 +49,13 @@ const elements = {
   imageLoading: document.getElementById('image-loading'),
   imageGallery: document.getElementById('image-gallery'),
   p5CanvasContainer: document.getElementById('p5-canvas-container'),
+  imageDownloadContainer: document.getElementById('image-download-container'),
+  downloadImageBtn: document.getElementById('download-image-btn'),
+  imageTransparent: document.getElementById('image-transparent'),
+  img2imgInput: document.getElementById('img2img-input'),
+  img2imgFilename: document.getElementById('img2img-filename'),
+  img2imgClear: document.getElementById('img2img-clear'),
+  img2imgPreview: document.getElementById('img2img-preview'),
 
   // NPC
   npcList: document.getElementById('npc-list'),
@@ -132,8 +147,21 @@ function setupEventListeners() {
   });
   elements.chatClear.addEventListener('click', clearChatHistory);
 
+  // Temperature slider
+  elements.chatTemperature.addEventListener('input', (e) => {
+    elements.temperatureValue.textContent = e.target.value;
+  });
+
   // Image
   elements.imageGenerate.addEventListener('click', generateImage);
+  elements.downloadImageBtn.addEventListener('click', downloadImage);
+
+  // Img2img file input
+  elements.img2imgInput.addEventListener('change', handleImg2imgInput);
+  elements.img2imgClear.addEventListener('click', clearImg2imgInput);
+
+  // Chat image attachments
+  elements.chatImageInput.addEventListener('change', handleChatImageInput);
 
   // NPC
   elements.npcCreate.addEventListener('click', createNPC);
@@ -451,37 +479,65 @@ async function sendChatMessage() {
   }
 
   const message = elements.chatInput.value.trim();
-  if (!message) return;
+  if (!message && chatAttachments.length === 0) return;
+
+  // Build user message display text
+  let displayText = message;
+  if (chatAttachments.length > 0) {
+    displayText += chatAttachments.length > 0 ? ` [${chatAttachments.length} image(s) attached]` : '';
+  }
 
   // Add user message
-  addChatMessage('user', message);
+  addChatMessage('user', displayText);
   elements.chatInput.value = '';
   elements.chatSend.disabled = true;
 
   try {
     const systemPrompt = elements.chatSystemPrompt.value.trim();
     const streaming = elements.chatStreaming.checked;
+    const temperature = parseFloat(elements.chatTemperature.value);
+
+    // Build messages array
+    const messages = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    // Build user message content (multimodal if attachments exist)
+    let userContent;
+    if (chatAttachments.length > 0) {
+      // Multimodal message using SDK helper
+      const images = chatAttachments.map(att => ({ url: att.url }));
+      const multimodalMsg = PlayKitSDK.createMultimodalMessage('user', message, images);
+      userContent = multimodalMsg.content;
+    } else {
+      userContent = message;
+    }
+    messages.push({ role: 'user', content: userContent });
+
+    // Clear attachments after building message
+    clearChatAttachments();
 
     if (streaming) {
-      // Streaming response
+      // Streaming response with temperature
       const aiMessageId = addChatMessage('assistant', '');
       const aiMessageElement = document.getElementById(aiMessageId);
 
-      await chatClient.chatStream(
-        message,
-        (chunk) => {
+      await chatClient.textGenerationStream({
+        messages,
+        temperature,
+        onChunk: (chunk) => {
           aiMessageElement.textContent += chunk;
           elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-        },
-        systemPrompt ? { systemPrompt } : undefined
-      );
+        }
+      });
     } else {
-      // Non-streaming response
-      const response = await chatClient.chat(
-        message,
-        systemPrompt ? { systemPrompt } : undefined
-      );
-      addChatMessage('assistant', response);
+      // Non-streaming response with temperature
+      const result = await chatClient.textGeneration({
+        messages,
+        temperature
+      });
+      addChatMessage('assistant', result.content);
     }
   } catch (error) {
     console.error('Chat error:', error);
@@ -527,17 +583,40 @@ async function generateImage() {
   }
 
   const prompt = elements.imagePrompt.value.trim();
-  if (!prompt) {
+  // Allow empty prompt if img2img is provided
+  if (!prompt && !img2imgData) {
     showNotification(i18n.t('enterImageDesc'), 'error');
     return;
   }
 
   elements.imageGenerate.disabled = true;
   elements.imageLoading.classList.remove('hidden');
+  elements.imageDownloadContainer.classList.add('hidden');
 
   try {
     const size = elements.imageSize.value;
-    const result = await imageClient.generate(prompt, size);
+    const transparent = elements.imageTransparent.checked;
+
+    let result;
+    if (img2imgData) {
+      // Img2img generation
+      result = await imageClient.img2img([img2imgData], prompt || undefined, {
+        size,
+        transparent: transparent || undefined
+      });
+      showNotification(i18n.t('img2imgSuccess') || 'Image-to-image generation successful!', 'success');
+    } else {
+      // Text-to-image generation
+      result = await imageClient.generateImage({
+        prompt,
+        size,
+        transparent: transparent || undefined
+      });
+      showNotification(i18n.t('imageGenSuccess'), 'success');
+    }
+
+    // Store for download
+    lastGeneratedImage = result;
 
     // Display in P5 canvas
     const img = await result.toHTMLImage();
@@ -546,9 +625,16 @@ async function generateImage() {
     });
 
     // Add to gallery
-    addImageToGallery(result, prompt);
+    addImageToGallery(result, prompt || 'img2img');
 
-    showNotification(i18n.t('imageGenSuccess'), 'success');
+    // Show download button
+    elements.imageDownloadContainer.classList.remove('hidden');
+
+    // Show transparent success info if applicable
+    if (transparent && result.transparentSuccess !== undefined) {
+      const successText = result.transparentSuccess ? 'Background removed successfully' : 'Background removal may not be complete';
+      showNotification(successText, result.transparentSuccess ? 'success' : 'info');
+    }
   } catch (error) {
     console.error('Image generation error:', error);
     showNotification(`${i18n.t('imageGenFailed')}: ${error.message}`, 'error');
@@ -556,6 +642,134 @@ async function generateImage() {
     elements.imageGenerate.disabled = false;
     elements.imageLoading.classList.add('hidden');
   }
+}
+
+// Set image size from preset buttons
+function setImageSize(size) {
+  elements.imageSize.value = size;
+  // Highlight selected preset
+  document.querySelectorAll('.size-preset-btn').forEach(btn => {
+    if (btn.dataset.size === size) {
+      btn.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
+    } else {
+      btn.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+    }
+  });
+}
+
+// Download the last generated image
+function downloadImage() {
+  if (!lastGeneratedImage) {
+    showNotification(i18n.t('noImageToDownload') || 'No image to download', 'error');
+    return;
+  }
+
+  const link = document.createElement('a');
+  link.download = `playkit-image-${Date.now()}.png`;
+  link.href = lastGeneratedImage.toDataURL();
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  showNotification(i18n.t('imageDownloaded') || 'Image downloaded!', 'success');
+}
+
+// Handle img2img file input
+function handleImg2imgInput(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    showNotification(i18n.t('invalidImageFile') || 'Please select a valid image file', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const dataUrl = event.target.result;
+    img2imgData = PlayKitSDK.ImageClient.dataUrlToImageInput(dataUrl);
+
+    // Update UI
+    elements.img2imgFilename.textContent = file.name;
+    elements.img2imgClear.classList.remove('hidden');
+
+    // Show preview
+    elements.img2imgPreview.src = dataUrl;
+    elements.img2imgPreview.classList.remove('hidden');
+
+    showNotification(i18n.t('img2imgLoaded') || 'Image loaded for img2img', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+// Clear img2img input
+function clearImg2imgInput() {
+  img2imgData = null;
+  elements.img2imgInput.value = '';
+  elements.img2imgFilename.textContent = i18n.t('noFileSelected') || 'No file selected';
+  elements.img2imgClear.classList.add('hidden');
+  elements.img2imgPreview.src = '';
+  elements.img2imgPreview.classList.add('hidden');
+}
+
+// Handle chat image attachment input
+function handleChatImageInput(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target.result;
+      chatAttachments.push({
+        type: 'image',
+        url: dataUrl,
+        name: file.name
+      });
+      renderChatAttachments();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Clear input for re-selection
+  e.target.value = '';
+}
+
+// Render chat attachment previews
+function renderChatAttachments() {
+  if (chatAttachments.length === 0) {
+    elements.chatAttachmentPreviews.innerHTML = '';
+    elements.chatAttachments.classList.add('hidden');
+    return;
+  }
+
+  elements.chatAttachments.classList.remove('hidden');
+  elements.chatAttachmentPreviews.innerHTML = '';
+
+  chatAttachments.forEach((attachment, index) => {
+    const preview = document.createElement('div');
+    preview.className = 'relative inline-block';
+    preview.innerHTML = `
+      <img src="${attachment.url}" class="w-16 h-16 object-cover rounded border" alt="${escapeHtml(attachment.name)}">
+      <button onclick="removeChatAttachment(${index})" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center hover:bg-red-600">&times;</button>
+    `;
+    elements.chatAttachmentPreviews.appendChild(preview);
+  });
+}
+
+// Remove a chat attachment
+function removeChatAttachment(index) {
+  chatAttachments.splice(index, 1);
+  renderChatAttachments();
+}
+
+// Clear all chat attachments
+function clearChatAttachments() {
+  chatAttachments = [];
+  renderChatAttachments();
 }
 
 function addImageToGallery(result, prompt) {

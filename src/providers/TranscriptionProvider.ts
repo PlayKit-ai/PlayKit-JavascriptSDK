@@ -1,10 +1,10 @@
 /**
- * Image generation provider for HTTP communication with image API
+ * Transcription provider for HTTP communication with audio transcription API
  */
 
 import {
-  ImageGenerationConfig,
-  ImageGenerationResponse,
+  TranscriptionConfig,
+  TranscriptionResponse,
   PlayKitError,
   SDKConfig,
 } from '../types';
@@ -13,7 +13,7 @@ import { PlayerClient } from '../core/PlayerClient';
 
 const DEFAULT_BASE_URL = 'https://playkit.ai';
 
-export class ImageProvider {
+export class TranscriptionProvider {
   private authManager: AuthManager;
   private config: SDKConfig;
   private baseURL: string;
@@ -33,44 +33,57 @@ export class ImageProvider {
   }
 
   /**
-   * Generate one or more images
+   * Convert audio data to base64 string
    */
-  async generateImages(imageConfig: ImageGenerationConfig): Promise<ImageGenerationResponse> {
+  private audioToBase64(audio: string | Uint8Array | ArrayBuffer): string {
+    if (typeof audio === 'string') {
+      return audio;
+    }
+
+    const bytes = audio instanceof ArrayBuffer ? new Uint8Array(audio) : audio;
+
+    // Check if we're in a browser environment
+    if (typeof btoa !== 'undefined') {
+      // Browser: use btoa
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    } else {
+      // Node.js: use Buffer
+      return Buffer.from(bytes).toString('base64');
+    }
+  }
+
+  /**
+   * Transcribe audio to text
+   */
+  async transcribe(transcriptionConfig: TranscriptionConfig): Promise<TranscriptionResponse> {
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
     }
 
-    const model = imageConfig.model || this.config.defaultImageModel || 'dall-e-3';
-    const endpoint = `/ai/${this.config.gameId}/v2/image`;
+    const model = transcriptionConfig.model || this.config.defaultTranscriptionModel || 'whisper-large';
+    const endpoint = `/ai/${this.config.gameId}/v2/audio/transcriptions`;
 
-    const requestBody: any = {
+    const audioBase64 = this.audioToBase64(transcriptionConfig.audio);
+
+    const requestBody: Record<string, unknown> = {
       model,
-      n: imageConfig.n || 1,
-      size: imageConfig.size || '1024x1024',
-      seed: imageConfig.seed || null,
+      audio: audioBase64,
     };
 
-    // Add prompt if provided
-    if (imageConfig.prompt) {
-      requestBody.prompt = imageConfig.prompt;
+    // Add optional parameters
+    if (transcriptionConfig.language) {
+      requestBody.language = transcriptionConfig.language;
     }
-
-    // Add input images for img2img
-    if (imageConfig.images && imageConfig.images.length > 0) {
-      requestBody.images = imageConfig.images.map(img => img.data);
+    if (transcriptionConfig.prompt) {
+      requestBody.prompt = transcriptionConfig.prompt;
     }
-
-    // Add optional quality and style if provided (for DALL-E models)
-    if (imageConfig.quality) {
-      requestBody.quality = imageConfig.quality;
-    }
-    if (imageConfig.style) {
-      requestBody.style = imageConfig.style;
-    }
-    // Add transparent option for background removal
-    if (imageConfig.transparent) {
-      requestBody.transparent = true;
+    if (transcriptionConfig.temperature !== undefined) {
+      requestBody.temperature = transcriptionConfig.temperature;
     }
 
     try {
@@ -84,15 +97,17 @@ export class ImageProvider {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Image generation failed' }));
+        const error = await response.json().catch(() => ({ message: 'Transcription failed' }));
         const playKitError = new PlayKitError(
-          error.message || 'Image generation failed',
+          error.message || 'Transcription failed',
           error.code,
           response.status
         );
 
         // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
+        if (error.code === 'INSUFFICIENT_CREDITS' ||
+            error.code === 'PLAYER_INSUFFICIENT_CREDIT' ||
+            response.status === 402) {
           if (this.playerClient) {
             await this.playerClient.handleInsufficientCredits(playKitError);
           }
@@ -117,7 +132,7 @@ export class ImageProvider {
       }
       throw new PlayKitError(
         error instanceof Error ? error.message : 'Unknown error',
-        'IMAGE_GENERATION_ERROR'
+        'TRANSCRIPTION_ERROR'
       );
     }
   }

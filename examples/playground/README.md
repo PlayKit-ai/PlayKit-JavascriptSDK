@@ -42,7 +42,7 @@ Then visit: `http://localhost:8000/examples/playground/`
 
 ### Getting Started
 
-1. **Enter Your Game ID**: Get this from [DeveloperWorks Platform](https://developerworks.agentlandlab.com)
+1. **Enter Your Game ID**: Get this from [PlayKit Platform](https://playkit.ai)
 
 2. **Choose Authentication Method**:
    - **Auto Login (Player)**: Best for production, shows login UI if needed
@@ -174,7 +174,7 @@ Requires:
 ## Resources
 
 - [PlayKit SDK Documentation](https://docs.agentlandlab.com)
-- [DeveloperWorks Platform](https://developerworks.agentlandlab.com)
+- [PlayKit Platform](https://playkit.ai)
 - [P5.js Reference](https://p5js.org/reference/)
 - [Tailwind CSS Docs](https://tailwindcss.com)
 

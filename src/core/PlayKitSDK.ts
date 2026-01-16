@@ -8,21 +8,28 @@ import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from './PlayerClient';
 import { ChatProvider } from '../providers/ChatProvider';
 import { ImageProvider } from '../providers/ImageProvider';
+import { TranscriptionProvider } from '../providers/TranscriptionProvider';
 import { ChatClient } from './ChatClient';
 import { ImageClient } from './ImageClient';
+import { TranscriptionClient } from './TranscriptionClient';
 import { NPCClient, NPCConfig } from './NPCClient';
 import { RechargeConfig } from '../types/recharge';
+import { AIContextManager, AIContextManagerConfig } from './AIContextManager';
+import { SchemaLibrary } from './SchemaLibrary';
 
 export class PlayKitSDK extends EventEmitter {
-  private config: SDKConfig & { recharge?: RechargeConfig };
+  private config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig };
   private authManager: AuthManager;
   private playerClient: PlayerClient;
   private chatProvider: ChatProvider;
   private imageProvider: ImageProvider;
+  private transcriptionProvider: TranscriptionProvider;
+  private contextManager: AIContextManager;
+  private schemaLibrary: SchemaLibrary;
   private initialized: boolean = false;
   private devTokenIndicator: HTMLDivElement | null = null;
 
-  constructor(config: SDKConfig & { recharge?: RechargeConfig }) {
+  constructor(config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig }) {
     super();
     this.config = {
       defaultChatModel: 'gpt-4o-mini',
@@ -36,10 +43,20 @@ export class PlayKitSDK extends EventEmitter {
     this.playerClient = new PlayerClient(this.authManager, this.config, this.config.recharge);
     this.chatProvider = new ChatProvider(this.authManager, this.config);
     this.imageProvider = new ImageProvider(this.authManager, this.config);
+    this.transcriptionProvider = new TranscriptionProvider(this.authManager, this.config);
 
     // Connect providers to player client for balance checking
     this.chatProvider.setPlayerClient(this.playerClient);
     this.imageProvider.setPlayerClient(this.playerClient);
+    this.transcriptionProvider.setPlayerClient(this.playerClient);
+
+    // Initialize AI context manager
+    this.contextManager = new AIContextManager(this.config.aiContext);
+    // Set chat client factory for compaction
+    this.contextManager.setChatClientFactory(() => this.createChatClient());
+
+    // Initialize schema library
+    this.schemaLibrary = new SchemaLibrary();
 
     // Forward authentication events
     this.authManager.on('authenticated', (authState) => {
@@ -113,8 +130,8 @@ export class PlayKitSDK extends EventEmitter {
             if (this.config.debug) {
               console.log('[PlayKitSDK] Restarting authentication flow...');
             }
-            const useExternalAuth = this.config.authMethod === 'external-auth';
-            await this.authManager.startAuthFlow(useExternalAuth);
+            const authMethod = this.config.authMethod || 'device';
+            await this.authManager.startAuthFlow(authMethod);
 
             // Retry getting player info after re-authentication
             await this.playerClient.getPlayerInfo();
@@ -233,9 +250,13 @@ export class PlayKitSDK extends EventEmitter {
 
   /**
    * Create a chat client
+   * Automatically uses the SDK's schema library
    */
   createChatClient(model?: string): ChatClient {
-    return new ChatClient(this.chatProvider, model || this.config.defaultChatModel);
+    const client = new ChatClient(this.chatProvider, model || this.config.defaultChatModel);
+    // Automatically use the SDK's schema library
+    client.setSchemaLibrary(this.schemaLibrary);
+    return client;
   }
 
   /**
@@ -246,11 +267,25 @@ export class PlayKitSDK extends EventEmitter {
   }
 
   /**
+   * Create a transcription client for audio-to-text
+   * @param model - Transcription model to use (default: 'whisper-large')
+   */
+  createTranscriptionClient(model?: string): TranscriptionClient {
+    return new TranscriptionClient(this.transcriptionProvider, model || this.config.defaultTranscriptionModel);
+  }
+
+  /**
    * Create an NPC client
+   * Automatically registers with AIContextManager
    */
   createNPCClient(config?: NPCConfig & { model?: string }): NPCClient {
     const chatClient = this.createChatClient(config?.model);
-    return new NPCClient(chatClient, config);
+    const npc = new NPCClient(chatClient, config);
+    
+    // Register with context manager
+    this.contextManager.registerNpc(npc);
+    
+    return npc;
   }
 
   /**
@@ -265,6 +300,38 @@ export class PlayKitSDK extends EventEmitter {
    */
   getPlayerClient(): PlayerClient {
     return this.playerClient;
+  }
+
+  /**
+   * Get AI context manager
+   * Use this to manage player descriptions, NPC tracking, and conversation compaction
+   */
+  getContextManager(): AIContextManager {
+    return this.contextManager;
+  }
+
+  /**
+   * Get the schema library
+   * Use this to register schemas for structured output generation
+   */
+  getSchemaLibrary(): SchemaLibrary {
+    return this.schemaLibrary;
+  }
+
+  /**
+   * Set the player description for AI context
+   * Convenience method - delegates to AIContextManager
+   */
+  setPlayerDescription(description: string): void {
+    this.contextManager.setPlayerDescription(description);
+  }
+
+  /**
+   * Get the player description
+   * Convenience method - delegates to AIContextManager
+   */
+  getPlayerDescription(): string | null {
+    return this.contextManager.getPlayerDescription();
   }
 
   /**

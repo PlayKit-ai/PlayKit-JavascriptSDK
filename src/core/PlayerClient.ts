@@ -15,6 +15,7 @@ const SET_NICKNAME_ENDPOINT = '/api/external/set-game-player-nickname';
 export class PlayerClient extends EventEmitter {
   private authManager: AuthManager;
   private baseURL: string;
+  private gameId: string;
   private playerInfo: PlayerInfo | null = null;
   private rechargeManager: RechargeManager | null = null;
   private balanceCheckInterval: NodeJS.Timeout | null = null;
@@ -24,17 +25,17 @@ export class PlayerClient extends EventEmitter {
     super();
     this.authManager = authManager;
     this.baseURL = config.baseURL || DEFAULT_BASE_URL;
+    this.gameId = config.gameId;
     this.rechargeConfig = {
       autoShowBalanceModal: rechargeConfig.autoShowBalanceModal ?? true,
       balanceCheckInterval: rechargeConfig.balanceCheckInterval ?? 30000,
       checkBalanceAfterApiCall: rechargeConfig.checkBalanceAfterApiCall ?? true,
-      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.ai/playerPortal/recharge',
+      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.ai/recharge',
     };
   }
 
   /**
    * Get player information
-   * For developer tokens, also returns developerBalance (RMB)
    */
   async getPlayerInfo(): Promise<PlayerInfo> {
     const token = this.authManager.getToken();
@@ -42,12 +43,27 @@ export class PlayerClient extends EventEmitter {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
     }
 
+    // If using developer token, return mock player info
+    const authState = this.authManager.getAuthState();
+    if (authState.tokenType === 'developer') {
+      return {
+        userId: 'developer',
+        credits: 999999,
+      };
+    }
+
     try {
+      // Build headers with X-Game-Id to support Global Developer Token
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
+      if (this.gameId) {
+        headers['X-Game-Id'] = this.gameId;
+      }
+
       const response = await fetch(`${this.baseURL}${PLAYER_INFO_ENDPOINT}`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -80,11 +96,16 @@ export class PlayerClient extends EventEmitter {
         userId: data.userId,
         credits: data.credits,
         nickname: data.nickname ?? null,
-        developerBalance: data.developerBalance ?? null,
-        tokenType: data.tokenType ?? null,
+        dailyRefresh: data.dailyRefresh,
       };
 
       this.emit('player_info_updated', this.playerInfo);
+
+      // Emit daily refresh event if credits were refreshed
+      if (data.dailyRefresh?.refreshed) {
+        this.emit('daily_credits_refreshed', data.dailyRefresh);
+      }
+
       return this.playerInfo;
     } catch (error) {
       this.emit('error', error);
@@ -193,7 +214,7 @@ export class PlayerClient extends EventEmitter {
   private initializeRechargeManager(): void {
     const token = this.authManager.getToken();
     if (token && !this.rechargeManager) {
-      this.rechargeManager = new RechargeManager(token, this.rechargeConfig.rechargePortalUrl);
+      this.rechargeManager = new RechargeManager(token, this.rechargeConfig.rechargePortalUrl, this.gameId);
 
       // Forward recharge events
       this.rechargeManager.on('recharge_opened', () => this.emit('recharge_opened'));
