@@ -12,6 +12,7 @@ const translations = {
     credits: '',  // No longer using "Spark", display USD amount directly
     rechargeButton: 'Recharge Now',
     cancelButton: 'Cancel',
+    dailyRefreshMessage: 'Your daily free {amount} credits have arrived!',
   },
   zh: {
     title: '余额不足',
@@ -20,6 +21,7 @@ const translations = {
     credits: '',  // 不再使用"Spark"，直接显示美元金额
     rechargeButton: '立即充值',
     cancelButton: '取消',
+    dailyRefreshMessage: '你的每日免费积分 {amount} 已到账！',
   },
   'zh-TW': {
     title: '餘額不足',
@@ -28,6 +30,7 @@ const translations = {
     credits: '',  // 不再使用"Spark"，直接顯示美元金額
     rechargeButton: '立即充值',
     cancelButton: '取消',
+    dailyRefreshMessage: '你的每日免費積分 {amount} 已到帳！',
   },
   ja: {
     title: '残高不足',
@@ -36,6 +39,7 @@ const translations = {
     credits: '',  // "Spark"は使用しません、USD金額を直接表示
     rechargeButton: '今すぐチャージ',
     cancelButton: 'キャンセル',
+    dailyRefreshMessage: '本日の無料クレジット {amount} が届きました！',
   },
   ko: {
     title: '잔액 부족',
@@ -44,6 +48,7 @@ const translations = {
     credits: '',  // "Spark" 사용 안 함, USD 금액 직접 표시
     rechargeButton: '지금 충전',
     cancelButton: '취소',
+    dailyRefreshMessage: '오늘의 무료 크레딧 {amount}이 도착했습니다!',
   },
 };
 
@@ -59,6 +64,8 @@ export class RechargeManager extends EventEmitter {
   private language: SupportedLanguage;
   private modalContainer: HTMLDivElement | null = null;
   private styleElement: HTMLStyleElement | null = null;
+  private toastElement: HTMLDivElement | null = null;
+  private toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     playerToken: string,
@@ -76,6 +83,11 @@ export class RechargeManager extends EventEmitter {
    * Detect user's preferred language
    */
   private detectLanguage(): SupportedLanguage {
+    // Return default language if navigator is not available (server environment)
+    if (typeof navigator === 'undefined') {
+      return 'en';
+    }
+
     const browserLang = navigator.language.toLowerCase();
 
     if (browserLang.startsWith('zh-tw') || browserLang.startsWith('zh-hk')) {
@@ -331,6 +343,86 @@ export class RechargeManager extends EventEmitter {
           flex-direction: column;
         }
       }
+
+      /* Daily Refresh Toast Styles */
+      .playkit-daily-refresh-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 16px 20px;
+        min-width: 240px;
+        max-width: 320px;
+        z-index: 999998;
+        animation: playkit-toast-slideIn 0.3s ease-out;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .playkit-daily-refresh-toast.hiding {
+        animation: playkit-toast-fadeOut 0.3s ease-out forwards;
+      }
+
+      @keyframes playkit-toast-slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes playkit-toast-fadeOut {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+
+      .playkit-toast-icon {
+        width: 24px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .playkit-toast-icon svg {
+        width: 14px;
+        height: 14px;
+        color: #ffffff;
+      }
+
+      .playkit-toast-message {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 500;
+        color: #ffffff;
+        line-height: 1.4;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      @media (max-width: 480px) {
+        .playkit-daily-refresh-toast {
+          top: 10px;
+          right: 10px;
+          left: 10px;
+          min-width: auto;
+          max-width: none;
+        }
+      }
     `;
 
     document.head.appendChild(this.styleElement);
@@ -408,12 +500,81 @@ export class RechargeManager extends EventEmitter {
   }
 
   /**
+   * Show daily refresh toast notification
+   */
+  public showDailyRefreshToast(result: { amountAdded: number }): void {
+    // Don't show if already showing
+    if (this.toastElement) {
+      return;
+    }
+
+    this.injectStyles();
+
+    // Create toast element
+    this.toastElement = document.createElement('div');
+    this.toastElement.className = 'playkit-daily-refresh-toast';
+
+    // Icon
+    const icon = document.createElement('div');
+    icon.className = 'playkit-toast-icon';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    this.toastElement.appendChild(icon);
+
+    // Message
+    const message = document.createElement('div');
+    message.className = 'playkit-toast-message';
+    message.textContent = this.t('dailyRefreshMessage').replace('{amount}', String(result.amountAdded));
+    this.toastElement.appendChild(message);
+    document.body.appendChild(this.toastElement);
+
+    // Auto-hide after 3 seconds
+    this.toastTimeout = setTimeout(() => {
+      this.hideToast();
+    }, 3000);
+  }
+
+  /**
+   * Hide the toast with fade-out animation
+   */
+  private hideToast(): void {
+    if (!this.toastElement) {
+      return;
+    }
+
+    // Add hiding class for animation
+    this.toastElement.classList.add('hiding');
+
+    // Remove after animation completes
+    setTimeout(() => {
+      if (this.toastElement) {
+        this.toastElement.remove();
+        this.toastElement = null;
+      }
+    }, 300);
+
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+      this.toastTimeout = null;
+    }
+  }
+
+  /**
    * Destroy the modal and clean up
    */
   public destroy(): void {
     if (this.modalContainer) {
       this.modalContainer.remove();
       this.modalContainer = null;
+    }
+
+    if (this.toastElement) {
+      this.toastElement.remove();
+      this.toastElement = null;
+    }
+
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+      this.toastTimeout = null;
     }
 
     if (this.styleElement) {

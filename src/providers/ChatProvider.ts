@@ -40,6 +40,9 @@ export class ChatProvider {
    * Make a chat completion request (non-streaming)
    */
   async chatCompletion(chatConfig: ChatConfig): Promise<ChatCompletionResponse> {
+    // Ensure token is valid, auto-refresh if needed (browser mode only)
+    await this.authManager.ensureValidToken();
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
@@ -114,6 +117,9 @@ export class ChatProvider {
   async chatCompletionStream(
     chatConfig: ChatConfig
   ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    // Ensure token is valid, auto-refresh if needed (browser mode only)
+    await this.authManager.ensureValidToken();
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
@@ -358,6 +364,9 @@ export class ChatProvider {
     schema?: Record<string, any>,
     schemaDescription?: string
   ): Promise<T> {
+    // Ensure token is valid, auto-refresh if needed (browser mode only)
+    await this.authManager.ensureValidToken();
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');

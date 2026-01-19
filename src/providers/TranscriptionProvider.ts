@@ -60,6 +60,9 @@ export class TranscriptionProvider {
    * Transcribe audio to text
    */
   async transcribe(transcriptionConfig: TranscriptionConfig): Promise<TranscriptionResponse> {
+    // Ensure token is valid, auto-refresh if needed (browser mode only)
+    await this.authManager.ensureValidToken();
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');

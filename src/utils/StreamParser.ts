@@ -3,7 +3,20 @@
  * Handles parsing of streaming text responses
  */
 
-import { StreamChunk } from '../types';
+import { textDecode } from './CryptoUtils';
+
+/**
+ * Create a cross-platform text decoder
+ */
+function createDecoder(): { decode: (data: Uint8Array, options?: { stream?: boolean }) => string } {
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder();
+  }
+  // Fallback for environments without TextDecoder
+  return {
+    decode: (data: Uint8Array, _options?: { stream?: boolean }) => textDecode(data),
+  };
+}
 
 export class StreamParser {
   /**
@@ -12,7 +25,7 @@ export class StreamParser {
   static async *parseStream(
     reader: ReadableStreamDefaultReader<Uint8Array>
   ): AsyncGenerator<string, void, unknown> {
-    const decoder = new TextDecoder();
+    const decoder = createDecoder();
     let buffer = '';
 
     try {

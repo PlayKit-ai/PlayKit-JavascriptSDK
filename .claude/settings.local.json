@@ -6,10 +6,12 @@
       "Bash(npm run build:*)",
       "WebSearch",
       "WebFetch(domain:baseweb.design)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir:*)"
     ],
     "additionalDirectories": [
-      "D:\\Project\\DeveloperWorks-UnitySDK"
+      "D:\\Project\\DeveloperWorks-UnitySDK",
+      "D:\\Project\\Agentland-Developerworks"
     ]
   }
 }

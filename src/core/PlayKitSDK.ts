@@ -3,7 +3,8 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { SDKConfig, PlayerInfo } from '../types';
+import { SDKConfig, PlayerInfo, TokenRefreshResult } from '../types';
+import type { DeviceAuthInitResult, DeviceAuthResult, TokenScope } from '../auth/DeviceAuthFlowManager';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from './PlayerClient';
 import { ChatProvider } from '../providers/ChatProvider';
@@ -16,6 +17,7 @@ import { NPCClient, NPCConfig } from './NPCClient';
 import { RechargeConfig } from '../types/recharge';
 import { AIContextManager, AIContextManagerConfig } from './AIContextManager';
 import { SchemaLibrary } from './SchemaLibrary';
+import { Logger, LogLevel, LogConfig } from '../utils/Logger';
 
 export class PlayKitSDK extends EventEmitter {
   private config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig };
@@ -28,6 +30,7 @@ export class PlayKitSDK extends EventEmitter {
   private schemaLibrary: SchemaLibrary;
   private initialized: boolean = false;
   private devTokenIndicator: HTMLDivElement | null = null;
+  private logger: Logger;
 
   constructor(config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig }) {
     super();
@@ -37,6 +40,10 @@ export class PlayKitSDK extends EventEmitter {
       debug: false,
       ...config,
     };
+
+    // Initialize logging system
+    this.initializeLogging(this.config);
+    this.logger = Logger.getLogger('PlayKitSDK');
 
     // Initialize managers and providers
     this.authManager = new AuthManager(this.config);
@@ -61,23 +68,22 @@ export class PlayKitSDK extends EventEmitter {
     // Forward authentication events
     this.authManager.on('authenticated', (authState) => {
       this.emit('authenticated', authState);
-      if (this.config.debug) {
-        console.log('[PlayKitSDK] Authenticated', authState);
-      }
+      this.logger.debug('Authenticated', authState);
     });
 
     this.authManager.on('unauthenticated', () => {
       this.emit('unauthenticated');
-      if (this.config.debug) {
-        console.log('[PlayKitSDK] Not authenticated');
-      }
+      this.logger.debug('Not authenticated');
     });
 
     this.authManager.on('error', (error) => {
       this.emit('error', error);
-      if (this.config.debug) {
-        console.error('[PlayKitSDK] Auth error', error);
-      }
+      this.logger.error('Auth error', error);
+    });
+
+    this.authManager.on('token_refreshed', (authState) => {
+      this.emit('token_refreshed', authState);
+      this.logger.debug('Token refreshed', authState);
     });
 
     // Forward recharge events
@@ -88,6 +94,7 @@ export class PlayKitSDK extends EventEmitter {
     this.playerClient.on('balance_low', (credits) => this.emit('balance_low', credits));
     this.playerClient.on('balance_updated', (credits) => this.emit('balance_updated', credits));
     this.playerClient.on('player_info_updated', (info) => this.emit('player_info_updated', info));
+    this.playerClient.on('daily_credits_refreshed', (result) => this.emit('daily_credits_refreshed', result));
   }
 
   /**
@@ -96,9 +103,7 @@ export class PlayKitSDK extends EventEmitter {
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
-      if (this.config.debug) {
-        console.warn('[PlayKitSDK] Already initialized');
-      }
+      this.logger.warn('Already initialized');
       return;
     }
 
@@ -106,8 +111,8 @@ export class PlayKitSDK extends EventEmitter {
       await this.authManager.initialize();
       this.initialized = true;
 
-      // Show developer token indicator if using developer token
-      if (this.config.developerToken && typeof window !== 'undefined') {
+      // Show developer token indicator if using developer token (browser mode only)
+      if (this.config.developerToken && this.config.mode !== 'server' && typeof window !== 'undefined') {
         this.showDeveloperTokenIndicator();
       }
 
@@ -115,29 +120,21 @@ export class PlayKitSDK extends EventEmitter {
       if (this.authManager.isAuthenticated()) {
         try {
           await this.playerClient.getPlayerInfo();
-          if (this.config.debug) {
-            console.log('[PlayKitSDK] Token validated and user info fetched');
-          }
+          this.logger.debug('Token validated and user info fetched');
         } catch (error) {
           // If token is invalid, logout and restart auth flow
-          if (this.config.debug) {
-            console.error('[PlayKitSDK] Token validation failed:', error);
-          }
+          this.logger.error('Token validation failed:', error);
           await this.authManager.logout();
 
           // Auto-restart login flow in browser environment
           if (typeof window !== 'undefined') {
-            if (this.config.debug) {
-              console.log('[PlayKitSDK] Restarting authentication flow...');
-            }
+            this.logger.debug('Restarting authentication flow...');
             const authMethod = this.config.authMethod || 'device';
             await this.authManager.startAuthFlow(authMethod);
 
             // Retry getting player info after re-authentication
             await this.playerClient.getPlayerInfo();
-            if (this.config.debug) {
-              console.log('[PlayKitSDK] Re-authentication successful, token validated');
-            }
+            this.logger.debug('Re-authentication successful, token validated');
           } else {
             throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
           }
@@ -146,9 +143,7 @@ export class PlayKitSDK extends EventEmitter {
 
       this.emit('ready');
 
-      if (this.config.debug) {
-        console.log('[PlayKitSDK] Initialized successfully');
-      }
+      this.logger.debug('Initialized successfully');
     } catch (error) {
       this.emit('error', error);
       throw error;
@@ -218,14 +213,10 @@ export class PlayKitSDK extends EventEmitter {
     // Verify token validity and fetch user info
     try {
       await this.playerClient.getPlayerInfo();
-      if (this.config.debug) {
-        console.log('[PlayKitSDK] Login successful, token validated and user info fetched');
-      }
+      this.logger.debug('Login successful, token validated and user info fetched');
     } catch (error) {
       // If token is invalid, logout and re-throw error
-      if (this.config.debug) {
-        console.error('[PlayKitSDK] Token validation failed after login:', error);
-      }
+      this.logger.error('Token validation failed after login:', error);
       await this.authManager.logout();
       throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
     }
@@ -289,6 +280,21 @@ export class PlayKitSDK extends EventEmitter {
   }
 
   /**
+   * Get current authentication token (convenience method)
+   * Returns undefined if not authenticated
+   */
+  getToken(): string | undefined {
+    return this.authManager.getToken();
+  }
+
+  /**
+   * Get current authentication state (convenience method)
+   */
+  getAuthState(): import('../types').AuthState {
+    return this.authManager.getAuthState();
+  }
+
+  /**
    * Get authentication manager (advanced usage)
    */
   getAuthManager(): AuthManager {
@@ -336,9 +342,42 @@ export class PlayKitSDK extends EventEmitter {
 
   /**
    * Enable or disable debug mode
+   * @deprecated Use configureLogging() instead
    */
   setDebug(enabled: boolean): void {
     this.config.debug = enabled;
+    Logger.setGlobalLevel(enabled ? LogLevel.DEBUG : LogLevel.WARN);
+  }
+
+  /**
+   * Configure the logging system
+   * @param config Logging configuration
+   */
+  configureLogging(config: LogConfig): void {
+    Logger.configure(config);
+  }
+
+  /**
+   * Get a logger instance for external use
+   * @param source The source/module identifier
+   */
+  static getLogger(source: string): Logger {
+    return Logger.getLogger(source);
+  }
+
+  /**
+   * Initialize logging system based on config
+   */
+  private initializeLogging(config: SDKConfig): void {
+    // Handle legacy debug option for backwards compatibility
+    if (config.debug !== undefined && config.logging === undefined) {
+      Logger.setGlobalLevel(config.debug ? LogLevel.DEBUG : LogLevel.WARN);
+    }
+
+    // Apply new logging config
+    if (config.logging) {
+      Logger.configure(config.logging);
+    }
   }
 
   /**
@@ -384,5 +423,111 @@ export class PlayKitSDK extends EventEmitter {
   async refreshBalance(): Promise<number> {
     const playerInfo = await this.playerClient.refreshPlayerInfo();
     return playerInfo.credits;
+  }
+
+  // ============================================================
+  // Headless Device Auth Methods (for terminal/CLI environments)
+  // ============================================================
+
+  /**
+   * Initiate device auth without opening browser or showing UI.
+   * Use this for headless/terminal environments where you need to handle
+   * the auth URL yourself (e.g., display QR code, print to console).
+   *
+   * @param scope - Requested scope (default: 'player:play')
+   * @returns Promise resolving to DeviceAuthInitResult with auth URL and session info
+   *
+   * @example
+   * ```ts
+   * // Terminal/CLI usage
+   * const { authUrl, sessionId, codeVerifier, expiresIn } = await sdk.initiateLogin();
+   * console.log('Please visit:', authUrl);
+   * // Or generate QR code from authUrl
+   *
+   * // Then poll for completion
+   * const result = await sdk.completeLogin(sessionId, codeVerifier, {
+   *   onStatus: (status) => console.log('Status:', status),
+   *   timeoutMs: expiresIn * 1000,
+   * });
+   * console.log('Logged in! Token:', result.access_token);
+   * ```
+   */
+  async initiateLogin(scope?: TokenScope): Promise<DeviceAuthInitResult> {
+    return this.authManager.initiateDeviceAuth(scope);
+  }
+
+  /**
+   * Complete the login flow after initiateLogin().
+   * Polls for authorization until user completes login or timeout.
+   * On success, automatically updates auth state.
+   *
+   * @param sessionId - Session ID from initiateLogin()
+   * @param codeVerifier - Code verifier from initiateLogin()
+   * @param options - Optional callbacks for status updates
+   * @returns Promise resolving to DeviceAuthResult with tokens
+   */
+  async completeLogin(
+    sessionId: string,
+    codeVerifier: string,
+    options?: {
+      /** Callback for status updates */
+      onStatus?: (status: 'pending' | 'slow_down' | 'authorized' | 'denied' | 'expired') => void;
+      /** Timeout in milliseconds (default: 600000 = 10 minutes) */
+      timeoutMs?: number;
+      /** Poll interval in milliseconds (default: 5000 = 5 seconds) */
+      pollIntervalMs?: number;
+    }
+  ): Promise<DeviceAuthResult> {
+    return this.authManager.pollDeviceAuth(sessionId, codeVerifier, options);
+  }
+
+  /**
+   * Cancel ongoing device auth flow
+   */
+  cancelLogin(): void {
+    this.authManager.cancelDeviceAuthFlow();
+  }
+
+  // ============================================================
+  // Token Refresh Methods
+  // ============================================================
+
+  /**
+   * Check if the current token is expired
+   */
+  isTokenExpired(): boolean {
+    return this.authManager.isTokenExpired();
+  }
+
+  /**
+   * Check if the access token can be refreshed
+   * @returns true if a valid refresh token exists
+   */
+  canRefreshToken(): boolean {
+    return this.authManager.canRefresh();
+  }
+
+  /**
+   * Manually refresh the access token using the stored refresh token.
+   *
+   * Note: In browser mode, token refresh is handled automatically before API calls.
+   * This method is useful for:
+   * - Proactively refreshing tokens before they expire
+   * - Server-side applications managing their own token lifecycle
+   *
+   * @returns Promise resolving to TokenRefreshResult with new tokens
+   * @throws PlayKitError if no refresh token is available or refresh fails
+   *
+   * @example
+   * ```ts
+   * // Manual refresh before a long operation
+   * if (sdk.isTokenExpired() && sdk.canRefreshToken()) {
+   *   const result = await sdk.refreshToken();
+   *   console.log('Token refreshed, expires in:', result.expiresIn, 'seconds');
+   * }
+   * ```
+   */
+  async refreshToken(): Promise<TokenRefreshResult> {
+    return this.authManager.refreshToken();
   }
 }

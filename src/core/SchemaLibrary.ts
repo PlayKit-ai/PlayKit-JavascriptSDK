@@ -3,6 +3,8 @@
  * This allows developers to manage all schemas in one place
  */
 
+import { Logger } from '../utils/Logger';
+
 /**
  * Schema entry definition
  */
@@ -21,6 +23,7 @@ export interface SchemaEntry {
  */
 export class SchemaLibrary {
   private schemas: Map<string, SchemaEntry> = new Map();
+  private logger = Logger.getLogger('SchemaLibrary');
 
   constructor(initialSchemas?: SchemaEntry[]) {
     if (initialSchemas) {
@@ -45,7 +48,7 @@ export class SchemaLibrary {
     }
 
     if (this.schemas.has(entry.name)) {
-      console.warn(`[SchemaLibrary] Schema '${entry.name}' already exists, overwriting`);
+      this.logger.warn(`Schema '${entry.name}' already exists, overwriting`);
     }
 
     // Validate JSON schema structure

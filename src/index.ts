@@ -39,7 +39,9 @@ export { DeviceAuthFlowManager } from './auth/DeviceAuthFlowManager';
 export type {
   DeviceAuthFlowOptions,
   DeviceAuthResult,
+  DeviceAuthInitResult,
   TokenScope,
+  GameInfo,
 } from './auth/DeviceAuthFlowManager';
 
 // Recharge
@@ -63,7 +65,9 @@ export type {
   AudioContentPart,
   APIResult,
   SDKConfig,
+  SDKMode,
   AuthState,
+  TokenRefreshResult,
   PlayerInfo,
   PlayKitError,
   // Chat types
@@ -95,6 +99,21 @@ export type {
 
 // Utilities
 export { StreamParser } from './utils/StreamParser';
+export { TokenValidator, defaultTokenValidator } from './utils/TokenValidator';
+export type {
+  ValidatedPlayerInfo,
+  TokenVerificationResult,
+  TokenValidatorOptions,
+} from './utils/TokenValidator';
+
+// Storage abstraction (for custom storage providers)
+export { BrowserStorage, MemoryStorage, createStorage, isLocalStorageAvailable } from './utils/Storage';
+export type { IStorage } from './utils/Storage';
+export type { TokenStorageOptions } from './auth/TokenStorage';
+
+// Logger
+export { Logger, LogLevel, BufferLogHandler, CallbackLogHandler } from './utils/Logger';
+export type { LogEntry, LogHandler, LogConfig } from './utils/Logger';
 
 // Default export
 export { PlayKitSDK as default } from './core/PlayKitSDK';

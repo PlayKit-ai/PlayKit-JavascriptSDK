@@ -36,6 +36,9 @@ export class ImageProvider {
    * Generate one or more images
    */
   async generateImages(imageConfig: ImageGenerationConfig): Promise<ImageGenerationResponse> {
+    // Ensure token is valid, auto-refresh if needed (browser mode only)
+    await this.authManager.ensureValidToken();
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');

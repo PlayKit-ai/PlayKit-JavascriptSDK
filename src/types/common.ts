@@ -2,6 +2,8 @@
  * Common types used across the SDK
  */
 
+import type { LogConfig } from '../utils/Logger';
+
 /**
  * Message role in a conversation
  */
@@ -142,6 +144,13 @@ export interface APIResult<T> {
 export type AuthMethod = 'device' | 'headless';
 
 /**
+ * SDK running mode
+ * - 'browser': Default mode with UI support (login dialogs, indicators, etc.)
+ * - 'server': Server/Node.js mode, disables UI-related features
+ */
+export type SDKMode = 'browser' | 'server';
+
+/**
  * SDK Configuration options
  */
 export interface SDKConfig {
@@ -154,8 +163,23 @@ export interface SDKConfig {
   /** Player JWT token for production (optional) */
   playerJWT?: string;
 
+  /**
+   * Player token to use directly (optional)
+   * When provided, SDK will use this token without triggering login flow.
+   * Useful for server-side usage where token is passed from client.
+   */
+  playerToken?: string;
+
   /** Base URL for API endpoints (optional, defaults to production) */
   baseURL?: string;
+
+  /**
+   * SDK running mode
+   * - 'browser': Default mode with UI support (login dialogs, indicators, etc.)
+   * - 'server': Server/Node.js mode, disables UI-related features
+   * Default: 'browser'
+   */
+  mode?: SDKMode;
 
   /**
    * Authentication method to use
@@ -174,8 +198,29 @@ export interface SDKConfig {
   /** Default transcription model to use */
   defaultTranscriptionModel?: string;
 
-  /** Enable debug logging */
+  /**
+   * Enable debug logging
+   * @deprecated Use `logging.level` instead. Will be removed in v2.0.
+   */
   debug?: boolean;
+
+  /**
+   * Logging configuration
+   * Controls how SDK logs are handled
+   *
+   * @example
+   * ```typescript
+   * const sdk = new PlayKitSDK({
+   *   gameId: 'your-game-id',
+   *   logging: {
+   *     level: LogLevel.DEBUG,
+   *     consoleEnabled: false,
+   *     handlers: [myCustomHandler],
+   *   }
+   * });
+   * ```
+   */
+  logging?: LogConfig;
 }
 
 /**
@@ -186,6 +231,28 @@ export interface AuthState {
   token?: string;
   tokenType?: 'developer' | 'player';
   expiresAt?: number;
+  /** Refresh token for obtaining new access tokens */
+  refreshToken?: string;
+  /** Refresh token expiration timestamp (milliseconds) */
+  refreshExpiresAt?: number;
+}
+
+/**
+ * Token refresh result
+ */
+export interface TokenRefreshResult {
+  /** New access token */
+  accessToken: string;
+  /** Token type (always "Bearer") */
+  tokenType: string;
+  /** Access token expiration time in seconds */
+  expiresIn: number;
+  /** Refresh token (same as before or rotated) */
+  refreshToken: string;
+  /** Refresh token expiration time in seconds */
+  refreshExpiresIn: number;
+  /** Token scope */
+  scope: string;
 }
 
 /**

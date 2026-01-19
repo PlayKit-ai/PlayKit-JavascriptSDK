@@ -12,6 +12,7 @@
 import EventEmitter from 'eventemitter3';
 import { Message, NpcAction, NpcActionResponse, npcActionToTool } from '../types';
 import { ChatClient } from './ChatClient';
+import { Logger } from '../utils/Logger';
 
 /**
  * Memory entry for NPC context
@@ -74,6 +75,7 @@ export class NPCClient extends EventEmitter {
   private predictionCount: number;
   private fastModel?: string;
   private _isTalking: boolean = false;
+  private logger = Logger.getLogger('NPCClient');
 
   constructor(chatClient: ChatClient, config?: NPCConfig) {
     super();
@@ -120,7 +122,7 @@ export class NPCClient extends EventEmitter {
    * This method is kept for backwards compatibility.
    */
   setSystemPrompt(prompt: string): void {
-    console.warn('[NPCClient] setSystemPrompt is deprecated. Use setCharacterDesign instead.');
+    this.logger.warn('setSystemPrompt is deprecated. Use setCharacterDesign instead.');
     this.setCharacterDesign(prompt);
   }
 
@@ -141,7 +143,7 @@ export class NPCClient extends EventEmitter {
    */
   setMemory(memoryName: string, memoryContent: string | null): void {
     if (!memoryName) {
-      console.warn('[NPCClient] Memory name cannot be empty');
+      this.logger.warn('Memory name cannot be empty');
       return;
     }
 
@@ -228,7 +230,7 @@ export class NPCClient extends EventEmitter {
     const predictionNum = count ?? this.predictionCount;
 
     if (this.history.length < 2) {
-      console.log('[NPCClient] Not enough conversation history to generate predictions');
+      this.logger.info('Not enough conversation history to generate predictions');
       return [];
     }
 
@@ -239,7 +241,7 @@ export class NPCClient extends EventEmitter {
         .find(m => m.role === 'assistant')?.content;
 
       if (!lastNpcMessage) {
-        console.log('[NPCClient] No NPC message found to generate predictions from');
+        this.logger.info('No NPC message found to generate predictions from');
         return [];
       }
 
@@ -275,7 +277,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
       });
 
       if (!result.content) {
-        console.warn('[NPCClient] Failed to generate predictions: empty response');
+        this.logger.warn('Failed to generate predictions: empty response');
         return [];
       }
 
@@ -288,7 +290,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
 
       return predictions;
     } catch (error) {
-      console.error('[NPCClient] Error generating predictions:', error);
+      this.logger.error('Error generating predictions:', error);
       return [];
     }
   }
@@ -303,7 +305,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
       const endIndex = response.lastIndexOf(']');
 
       if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
-        console.warn('[NPCClient] Could not find JSON array in prediction response');
+        this.logger.warn('Could not find JSON array in prediction response');
         return this.extractPredictionsFromText(response, expectedCount);
       }
 
@@ -318,7 +320,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
 
       return [];
     } catch (error) {
-      console.warn('[NPCClient] Failed to parse predictions JSON:', error);
+      this.logger.warn('Failed to parse predictions JSON:', error);
       return this.extractPredictionsFromText(response, expectedCount);
     }
   }
@@ -369,7 +371,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
 
     // Fire and forget - don't block the main response
     this.generateReplyPredictions().catch(err => {
-      console.error('[NPCClient] Background prediction generation failed:', err);
+      this.logger.error('Background prediction generation failed:', err);
     });
   }
 
@@ -473,7 +475,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
    * @deprecated Use talkWithActions instead for NPC decision-making with actions
    */
   async talkStructured<T = any>(message: string, schemaName: string): Promise<T> {
-    console.warn('[NPCClient] talkStructured is deprecated. Use talkWithActions instead for NPC decision-making with actions.');
+    this.logger.warn('talkStructured is deprecated. Use talkWithActions instead for NPC decision-making with actions.');
     // Add user message to history
     const userMessage: Message = { role: 'user', content: message };
     this.history.push(userMessage);
@@ -790,7 +792,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
    */
   appendChatMessage(role: string, content: string): void {
     if (!role || !content) {
-      console.warn('[NPCClient] Role and content cannot be empty');
+      this.logger.warn('Role and content cannot be empty');
       return;
     }
     this.appendMessage({ role: role as any, content });
@@ -848,7 +850,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
       this.emit('history_loaded');
       return true;
     } catch (error) {
-      console.error('[NPCClient] Failed to load history:', error);
+      this.logger.error('Failed to load history:', error);
       return false;
     }
   }

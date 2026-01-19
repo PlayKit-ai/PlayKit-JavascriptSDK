@@ -7,6 +7,7 @@ import { PlayerInfo, PlayKitError, SDKConfig, SetNicknameResponse } from '../typ
 import { AuthManager } from '../auth/AuthManager';
 import { RechargeManager } from '../recharge/RechargeManager';
 import { RechargeConfig } from '../types/recharge';
+import { Logger } from '../utils/Logger';
 
 const DEFAULT_BASE_URL = 'https://playkit.ai';
 const PLAYER_INFO_ENDPOINT = '/api/external/player-info';
@@ -20,6 +21,7 @@ export class PlayerClient extends EventEmitter {
   private rechargeManager: RechargeManager | null = null;
   private balanceCheckInterval: NodeJS.Timeout | null = null;
   private rechargeConfig: RechargeConfig;
+  private logger = Logger.getLogger('PlayerClient');
 
   constructor(authManager: AuthManager, config: SDKConfig, rechargeConfig: RechargeConfig = {}) {
     super();
@@ -31,6 +33,7 @@ export class PlayerClient extends EventEmitter {
       balanceCheckInterval: rechargeConfig.balanceCheckInterval ?? 30000,
       checkBalanceAfterApiCall: rechargeConfig.checkBalanceAfterApiCall ?? true,
       rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.ai/recharge',
+      showDailyRefreshToast: rechargeConfig.showDailyRefreshToast ?? true,
     };
   }
 
@@ -104,6 +107,14 @@ export class PlayerClient extends EventEmitter {
       // Emit daily refresh event if credits were refreshed
       if (data.dailyRefresh?.refreshed) {
         this.emit('daily_credits_refreshed', data.dailyRefresh);
+
+        // Show toast notification if enabled
+        if (this.rechargeConfig.showDailyRefreshToast !== false) {
+          this.initializeRechargeManager();
+          if (this.rechargeManager) {
+            this.rechargeManager.showDailyRefreshToast(data.dailyRefresh);
+          }
+        }
       }
 
       return this.playerInfo;
@@ -230,7 +241,7 @@ export class PlayerClient extends EventEmitter {
     this.initializeRechargeManager();
 
     if (!this.rechargeManager) {
-      console.warn('RechargeManager not initialized. Cannot show modal.');
+      this.logger.warn('RechargeManager not initialized. Cannot show modal.');
       return;
     }
 
@@ -248,7 +259,7 @@ export class PlayerClient extends EventEmitter {
     this.initializeRechargeManager();
 
     if (!this.rechargeManager) {
-      console.warn('RechargeManager not initialized. Cannot open recharge window.');
+      this.logger.warn('RechargeManager not initialized. Cannot open recharge window.');
       return;
     }
 
@@ -287,7 +298,7 @@ export class PlayerClient extends EventEmitter {
         }
       } catch (error) {
         // Silently fail periodic checks to avoid spamming errors
-        console.debug('Failed to check balance:', error);
+        this.logger.debug('Failed to check balance:', error);
       }
     }, interval);
   }
@@ -314,7 +325,7 @@ export class PlayerClient extends EventEmitter {
       await this.refreshPlayerInfo();
     } catch (error) {
       // Silently fail to avoid disrupting the main flow
-      console.debug('Failed to check balance after API call:', error);
+      this.logger.debug('Failed to check balance after API call:', error);
     }
   }
 

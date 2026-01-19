@@ -10,6 +10,7 @@
 import EventEmitter from 'eventemitter3';
 import { NPCClient } from './NPCClient';
 import { ChatClient } from './ChatClient';
+import { Logger } from '../utils/Logger';
 
 /**
  * Configuration for AIContextManager
@@ -65,12 +66,13 @@ export interface AIContextManagerEvents {
  */
 export class AIContextManager extends EventEmitter<AIContextManagerEvents> {
   private static _instance: AIContextManager | null = null;
-  
+
   private config: Required<AIContextManagerConfig>;
   private playerDescription: string | null = null;
   private npcStates: Map<NPCClient, NpcConversationState> = new Map();
   private autoCompactTimer: ReturnType<typeof setInterval> | null = null;
   private chatClientFactory: (() => ChatClient) | null = null;
+  private logger = Logger.getLogger('AIContextManager');
 
   constructor(config?: AIContextManagerConfig) {
     super();
@@ -262,12 +264,12 @@ export class AIContextManager extends EventEmitter<AIContextManagerEvents> {
    */
   async compactConversation(npc: NPCClient): Promise<boolean> {
     if (!npc) {
-      console.warn('[AIContextManager] Cannot compact: NPC is null');
+      this.logger.warn('Cannot compact: NPC is null');
       return false;
     }
 
     if (!this.chatClientFactory) {
-      console.error('[AIContextManager] Cannot compact: No chat client factory set. Call setChatClientFactory() first.');
+      this.logger.error('Cannot compact: No chat client factory set. Call setChatClientFactory() first.');
       return false;
     }
 
@@ -275,12 +277,12 @@ export class AIContextManager extends EventEmitter<AIContextManagerEvents> {
     const nonSystemMessages = history.filter(m => m.role !== 'system');
 
     if (nonSystemMessages.length < 2) {
-      console.log('[AIContextManager] Skipping compaction: not enough messages');
+      this.logger.info('Skipping compaction: not enough messages');
       return false;
     }
 
     try {
-      console.log(`[AIContextManager] Starting compaction (${nonSystemMessages.length} messages)`);
+      this.logger.info(`Starting compaction (${nonSystemMessages.length} messages)`);
 
       // Build conversation text for summarization
       const conversationText = nonSystemMessages
@@ -310,7 +312,7 @@ ${conversationText}`;
 
       if (!result.content) {
         const error = 'Empty response from summarization';
-        console.error(`[AIContextManager] Compaction failed: ${error}`);
+        this.logger.error(`Compaction failed: ${error}`);
         this.emit('compactionFailed', npc, error);
         return false;
       }
@@ -326,12 +328,12 @@ ${conversationText}`;
         state.compactionCount++;
       }
 
-      console.log(`[AIContextManager] Compaction completed. Summary: ${result.content.substring(0, 100)}...`);
+      this.logger.info(`Compaction completed. Summary: ${result.content.substring(0, 100)}...`);
       this.emit('npcCompacted', npc);
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[AIContextManager] Compaction error: ${errorMessage}`);
+      this.logger.error(`Compaction error: ${errorMessage}`);
       this.emit('compactionFailed', npc, errorMessage);
       return false;
     }
@@ -350,7 +352,7 @@ ${conversationText}`;
       return 0;
     }
 
-    console.log(`[AIContextManager] Compacting ${eligibleNpcs.length} eligible NPCs`);
+    this.logger.info(`Compacting ${eligibleNpcs.length} eligible NPCs`);
 
     let successCount = 0;
     for (const npc of eligibleNpcs) {
@@ -399,7 +401,7 @@ ${conversationText}`;
     for (const npc of eligibleNpcs) {
       // Fire and forget - don't block
       this.compactConversation(npc).catch(err => {
-        console.error('[AIContextManager] Auto-compact error:', err);
+        this.logger.error('Auto-compact error:', err);
       });
     }
   }

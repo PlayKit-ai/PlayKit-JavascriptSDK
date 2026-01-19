@@ -30,6 +30,12 @@ export interface RechargeConfig {
    * @default 'https://playkit.ai/recharge'
    */
   rechargePortalUrl?: string;
+
+  /**
+   * Automatically show Toast notification when daily credits are refreshed
+   * @default true
+   */
+  showDailyRefreshToast?: boolean;
 }
 
 /**
