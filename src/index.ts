@@ -69,6 +69,8 @@ export type {
   AuthState,
   TokenRefreshResult,
   PlayerInfo,
+  SetNicknameRequest,
+  SetNicknameResponse,
   PlayKitError,
   // Chat types
   ChatConfig,

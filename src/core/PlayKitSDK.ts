@@ -3,7 +3,7 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { SDKConfig, PlayerInfo, TokenRefreshResult } from '../types';
+import { SDKConfig, PlayerInfo, TokenRefreshResult, SetNicknameResponse } from '../types';
 import type { DeviceAuthInitResult, DeviceAuthResult, TokenScope } from '../auth/DeviceAuthFlowManager';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from './PlayerClient';
@@ -95,6 +95,7 @@ export class PlayKitSDK extends EventEmitter {
     this.playerClient.on('balance_updated', (credits) => this.emit('balance_updated', credits));
     this.playerClient.on('player_info_updated', (info) => this.emit('player_info_updated', info));
     this.playerClient.on('daily_credits_refreshed', (result) => this.emit('daily_credits_refreshed', result));
+    this.playerClient.on('nickname_changed', (nickname) => this.emit('nickname_changed', nickname));
   }
 
   /**
@@ -423,6 +424,28 @@ export class PlayKitSDK extends EventEmitter {
   async refreshBalance(): Promise<number> {
     const playerInfo = await this.playerClient.refreshPlayerInfo();
     return playerInfo.credits;
+  }
+
+  // ============================================================
+  // Player Profile Methods
+  // ============================================================
+
+  /**
+   * Get player's nickname (cached)
+   * @returns Nickname or null if not set
+   */
+  getNickname(): string | null {
+    return this.playerClient.getNickname();
+  }
+
+  /**
+   * Set player's nickname for the current game
+   * @param nickname - 1-16 characters (letters, numbers, Chinese, underscores, spaces)
+   * @returns SetNicknameResponse with success status and gameId
+   * @throws PlayKitError if validation fails or token type is invalid
+   */
+  async setNickname(nickname: string): Promise<SetNicknameResponse> {
+    return await this.playerClient.setNickname(nickname);
   }
 
   // ============================================================
