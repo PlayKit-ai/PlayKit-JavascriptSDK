@@ -3,7 +3,7 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { SDKConfig, PlayerInfo, TokenRefreshResult, SetNicknameResponse } from '../types';
+import { SDKConfig, PlayerInfo, TokenRefreshResult, SetNicknameResponse, PlayKitError } from '../types';
 import type { DeviceAuthInitResult, DeviceAuthResult, TokenScope } from '../auth/DeviceAuthFlowManager';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from './PlayerClient';
@@ -234,9 +234,23 @@ export class PlayKitSDK extends EventEmitter {
   }
 
   /**
+   * Ensure SDK is initialized before making API calls
+   * @throws PlayKitError if not initialized
+   */
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new PlayKitError(
+        'SDK not initialized. Call await sdk.initialize() before using API methods.',
+        'NOT_INITIALIZED'
+      );
+    }
+  }
+
+  /**
    * Get player information
    */
   async getPlayerInfo(): Promise<PlayerInfo> {
+    this.ensureInitialized();
     return await this.playerClient.getPlayerInfo();
   }
 
@@ -245,6 +259,7 @@ export class PlayKitSDK extends EventEmitter {
    * Automatically uses the SDK's schema library
    */
   createChatClient(model?: string): ChatClient {
+    this.ensureInitialized();
     const client = new ChatClient(this.chatProvider, model || this.config.defaultChatModel);
     // Automatically use the SDK's schema library
     client.setSchemaLibrary(this.schemaLibrary);
@@ -255,6 +270,7 @@ export class PlayKitSDK extends EventEmitter {
    * Create an image client
    */
   createImageClient(model?: string): ImageClient {
+    this.ensureInitialized();
     return new ImageClient(this.imageProvider, model || this.config.defaultImageModel);
   }
 
@@ -263,6 +279,7 @@ export class PlayKitSDK extends EventEmitter {
    * @param model - Transcription model to use (default: 'whisper-large')
    */
   createTranscriptionClient(model?: string): TranscriptionClient {
+    this.ensureInitialized();
     return new TranscriptionClient(this.transcriptionProvider, model || this.config.defaultTranscriptionModel);
   }
 
@@ -271,12 +288,13 @@ export class PlayKitSDK extends EventEmitter {
    * Automatically registers with AIContextManager
    */
   createNPCClient(config?: NPCConfig & { model?: string }): NPCClient {
+    this.ensureInitialized();
     const chatClient = this.createChatClient(config?.model);
     const npc = new NPCClient(chatClient, config);
-    
+
     // Register with context manager
     this.contextManager.registerNpc(npc);
-    
+
     return npc;
   }
 
@@ -385,6 +403,7 @@ export class PlayKitSDK extends EventEmitter {
    * Show insufficient balance modal
    */
   async showInsufficientBalanceModal(customMessage?: string): Promise<void> {
+    this.ensureInitialized();
     return await this.playerClient.showInsufficientBalanceModal(customMessage);
   }
 
@@ -415,15 +434,16 @@ export class PlayKitSDK extends EventEmitter {
    */
   getCachedBalance(): number | null {
     const playerInfo = this.playerClient.getCachedPlayerInfo();
-    return playerInfo?.credits ?? null;
+    return playerInfo?.balance ?? null;
   }
 
   /**
    * Refresh and get player's current balance
    */
   async refreshBalance(): Promise<number> {
+    this.ensureInitialized();
     const playerInfo = await this.playerClient.refreshPlayerInfo();
-    return playerInfo.credits;
+    return playerInfo.balance;
   }
 
   // ============================================================
@@ -445,6 +465,7 @@ export class PlayKitSDK extends EventEmitter {
    * @throws PlayKitError if validation fails or token type is invalid
    */
   async setNickname(nickname: string): Promise<SetNicknameResponse> {
+    this.ensureInitialized();
     return await this.playerClient.setNickname(nickname);
   }
 

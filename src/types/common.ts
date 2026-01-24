@@ -276,7 +276,12 @@ export interface DailyRefreshResult {
  */
 export interface PlayerInfo {
   userId: string;
-  credits: number;
+  /** Display balance (unified across all token types) */
+  balance: number;
+  /**
+   * @deprecated Use `balance` instead. Will be removed in v2.0.
+   */
+  credits?: number;
   /** Player nickname (per-game nickname > first_name > null) */
   nickname?: string | null;
   /** Daily refresh result (automatically triggered on player-info request) */

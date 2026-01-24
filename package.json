@@ -1,6 +1,6 @@
 {
   "name": "playkit-sdk",
-  "version": "1.2.8-beta.3",
+  "version": "1.2.8-beta.5",
   "description": "PlayKit SDK for JavaScript",
   "main": "dist/playkit-sdk.cjs.js",
   "module": "dist/playkit-sdk.esm.js",

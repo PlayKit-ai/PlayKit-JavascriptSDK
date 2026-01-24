@@ -46,15 +46,6 @@ export class PlayerClient extends EventEmitter {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
     }
 
-    // If using developer token, return mock player info
-    const authState = this.authManager.getAuthState();
-    if (authState.tokenType === 'developer') {
-      return {
-        userId: 'developer',
-        credits: 999999,
-      };
-    }
-
     try {
       // Build headers with X-Game-Id to support Global Developer Token
       const headers: Record<string, string> = {
@@ -97,6 +88,7 @@ export class PlayerClient extends EventEmitter {
       const data = await response.json();
       this.playerInfo = {
         userId: data.userId,
+        balance: data.balance ?? 0,
         credits: data.credits,
         nickname: data.nickname ?? null,
         dailyRefresh: data.dailyRefresh,
@@ -245,7 +237,7 @@ export class PlayerClient extends EventEmitter {
       return;
     }
 
-    const balance = this.playerInfo?.credits;
+    const balance = this.playerInfo?.balance;
     await this.rechargeManager.showInsufficientBalanceModal({
       currentBalance: balance,
       message: customMessage,
@@ -283,9 +275,9 @@ export class PlayerClient extends EventEmitter {
     // Start periodic balance check
     this.balanceCheckInterval = setInterval(async () => {
       try {
-        const oldBalance = this.playerInfo?.credits;
+        const oldBalance = this.playerInfo?.balance;
         await this.refreshPlayerInfo();
-        const newBalance = this.playerInfo?.credits;
+        const newBalance = this.playerInfo?.balance;
 
         // Emit balance_updated event
         if (newBalance !== undefined) {
