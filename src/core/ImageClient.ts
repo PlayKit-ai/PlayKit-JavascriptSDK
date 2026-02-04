@@ -42,7 +42,7 @@ class GeneratedImageImpl implements GeneratedImage {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = (e) => reject(new Error('Failed to load image'));
+      img.onerror = (_e) => reject(new Error('Failed to load image'));
       img.src = this.toDataURL();
     });
   }
@@ -77,7 +77,7 @@ export class ImageClient {
     return new GeneratedImageImpl(
       imageData.b64_json,
       config.prompt,
-      imageData.revised_prompt,
+      imageData.revised_prompt ?? config.prompt,
       config.size,
       imageData.b64_json_original,
       imageData.transparent_success
@@ -106,7 +106,7 @@ export class ImageClient {
       return new GeneratedImageImpl(
         imageData.b64_json,
         config.prompt,
-        imageData.revised_prompt,
+        imageData.revised_prompt ?? config.prompt,
         config.size,
         imageData.b64_json_original,
         imageData.transparent_success

@@ -2,10 +2,21 @@
  * Chat client for AI text generation
  */
 
-import { ChatConfig, ChatResult, ChatStreamConfig, StructuredOutputConfig, ChatTool, ToolCall, Message } from '../types';
+import { ChatConfig, ChatResult, ChatStreamConfig, StructuredOutputConfig, ChatTool, ToolCall, Message, MessageContent } from '../types';
 import { ChatProvider } from '../providers/ChatProvider';
 import { StreamParser } from '../utils/StreamParser';
 import { SchemaLibrary } from './SchemaLibrary';
+
+/**
+ * Helper to extract string from MessageContent
+ */
+function contentToString(content: MessageContent | null | undefined): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  // For array of content parts, extract text parts
+  const textParts = content.filter(part => part.type === 'text');
+  return textParts.map(part => (part as { type: 'text'; text: string }).text).join('');
+}
 
 /**
  * Config for text generation with tools
@@ -140,7 +151,7 @@ export class ChatClient {
     }
 
     return {
-      content: choice.message.content,
+      content: contentToString(choice.message.content),
       model: response.model,
       finishReason: choice.finish_reason as any,
       usage: response.usage
@@ -273,10 +284,11 @@ export class ChatClient {
 
     // Extract user message content from the last user message
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
-    const prompt = lastUserMessage?.content || '';
+    const prompt = contentToString(lastUserMessage?.content);
 
     // Build system message from messages array
-    const systemMessage = messages.find(m => m.role === 'system')?.content;
+    const systemMessageContent = messages.find(m => m.role === 'system')?.content;
+    const systemMessage = contentToString(systemMessageContent) || undefined;
 
     return this.generateStructuredWithSchema<T>(
       schemaEntry.schema,
@@ -416,7 +428,7 @@ export class ChatClient {
     }
 
     return {
-      content: choice.message.content || '',
+      content: contentToString(choice.message.content),
       model: response.model,
       finishReason: choice.finish_reason as any,
       usage: response.usage

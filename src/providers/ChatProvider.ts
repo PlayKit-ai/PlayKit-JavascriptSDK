@@ -2,10 +2,20 @@
  * Chat provider for HTTP communication with chat API
  */
 
-import { ChatConfig, ChatCompletionResponse, PlayKitError, SDKConfig, ChatTool } from '../types';
+import { ChatConfig, ChatCompletionResponse, PlayKitError, SDKConfig, ChatTool, MessageContent } from '../types';
 import { AuthManager } from '../auth/AuthManager';
-import { StreamParser } from '../utils/StreamParser';
 import { PlayerClient } from '../core/PlayerClient';
+
+/**
+ * Helper to extract string from MessageContent
+ */
+function contentToString(content: MessageContent | null | undefined): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  // For array of content parts, extract text parts
+  const textParts = content.filter(part => part.type === 'text');
+  return textParts.map(part => (part as { type: 'text'; text: string }).text).join('');
+}
 
 /**
  * Chat config with tools support
@@ -431,12 +441,13 @@ export class ChatProvider {
       }
 
       // Parse the response content as JSON
-      const content = result.choices[0]?.message.content;
-      if (!content) {
+      const rawContent = result.choices[0]?.message.content;
+      if (!rawContent) {
         throw new PlayKitError('No content in response', 'NO_CONTENT');
       }
 
       try {
+        const content = contentToString(rawContent);
         return JSON.parse(content);
       } catch (parseError) {
         throw new PlayKitError('Failed to parse structured output', 'PARSE_ERROR');
