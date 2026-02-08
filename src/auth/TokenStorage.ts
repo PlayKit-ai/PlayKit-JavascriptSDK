@@ -203,6 +203,6 @@ export class TokenStorage {
   private base64ToArrayBuffer(base64: string): ArrayBuffer {
     const decoded = base64Decode(base64);
     // Copy to a new ArrayBuffer to ensure proper type
-    return decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength);
+    return decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) as ArrayBuffer;
   }
 }

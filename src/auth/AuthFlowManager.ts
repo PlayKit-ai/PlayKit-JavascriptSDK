@@ -154,8 +154,8 @@ const translations: Record<SupportedLanguage, I18nTranslations> = {
 export class AuthFlowManager extends EventEmitter {
   private baseURL: string;
   private currentSessionId: string | null = null;
-  private uiContainer: HTMLElement | null = null;
-  private isSuccess: boolean = false;
+  private _uiContainer: HTMLElement | null = null;
+  private _isSuccess: boolean = false;
   private currentLanguage: SupportedLanguage = 'en';
 
   // UI Elements
@@ -685,7 +685,7 @@ export class AuthFlowManager extends EventEmitter {
 
       // Auto-submit when all 6 digits entered
       const codeInputs = this.modal?.querySelectorAll('.playkit-code-input') as NodeListOf<HTMLInputElement>;
-      codeInputs?.forEach((input, index) => {
+      codeInputs?.forEach((input, _index) => {
         input.addEventListener('input', () => {
           // Check if all inputs are filled
           const allFilled = Array.from(codeInputs).every(inp => inp.value.length === 1);

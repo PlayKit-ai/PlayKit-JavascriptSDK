@@ -69,6 +69,8 @@ export class AIContextManager extends EventEmitter<AIContextManagerEvents> {
 
   private config: Required<AIContextManagerConfig>;
   private playerDescription: string | null = null;
+  private playerPrompt: string | null = null;
+  private playerMemories: Map<string, string> = new Map();
   private npcStates: Map<NPCClient, NpcConversationState> = new Map();
   private autoCompactTimer: ReturnType<typeof setInterval> | null = null;
   private chatClientFactory: (() => ChatClient) | null = null;
@@ -168,6 +170,97 @@ export class AIContextManager extends EventEmitter<AIContextManagerEvents> {
   clearPlayerDescription(): void {
     this.playerDescription = null;
     this.emit('playerDescriptionChanged', null);
+  }
+
+  // ===== Player Prompt & Memory (for Reply Prediction) =====
+
+  /**
+   * Set the player's character prompt/persona.
+   * This defines how the player character speaks and behaves.
+   * Used when generating reply predictions to match the player's tone.
+   * @param prompt The player character's persona/prompt
+   */
+  setPlayerPrompt(prompt: string | null): void {
+    this.playerPrompt = prompt;
+  }
+
+  /**
+   * Get the current player prompt.
+   * @returns The player prompt, or null if not set
+   */
+  getPlayerPrompt(): string | null {
+    return this.playerPrompt;
+  }
+
+  /**
+   * Set or update a memory for the player character.
+   * Memories are appended to the player prompt to form the full player context.
+   * Set memoryContent to null or empty to remove the memory.
+   * @param memoryName The name/key of the memory
+   * @param memoryContent The content of the memory. Null or empty to remove.
+   */
+  setPlayerMemory(memoryName: string, memoryContent: string | null): void {
+    if (!memoryName) {
+      this.logger.warn('Memory name cannot be empty');
+      return;
+    }
+
+    if (!memoryContent) {
+      // Remove memory if content is null or empty
+      this.playerMemories.delete(memoryName);
+    } else {
+      // Add or update memory
+      this.playerMemories.set(memoryName, memoryContent);
+    }
+  }
+
+  /**
+   * Get a specific player memory by name.
+   * @param memoryName The name of the memory to retrieve
+   * @returns The memory content, or undefined if not found
+   */
+  getPlayerMemory(memoryName: string): string | undefined {
+    return this.playerMemories.get(memoryName);
+  }
+
+  /**
+   * Get all player memory names currently stored.
+   * @returns Array of memory names
+   */
+  getPlayerMemoryNames(): string[] {
+    return Array.from(this.playerMemories.keys());
+  }
+
+  /**
+   * Clear all player memories (but keep player prompt).
+   */
+  clearPlayerMemories(): void {
+    this.playerMemories.clear();
+  }
+
+  /**
+   * Build the complete player context from PlayerPrompt + PlayerMemories.
+   * Used by NPCClient for generating reply predictions.
+   * @returns The combined player context string, or null if no context is set
+   */
+  buildPlayerContext(): string | null {
+    const parts: string[] = [];
+
+    if (this.playerPrompt) {
+      parts.push(this.playerPrompt);
+    }
+
+    if (this.playerMemories.size > 0) {
+      const memoryStrings = Array.from(this.playerMemories.entries())
+        .map(([name, content]) => `[${name}]: ${content}`);
+      parts.push('Player Memories:\n' + memoryStrings.join('\n'));
+    }
+
+    if (parts.length === 0) {
+      return null;
+    }
+
+    return parts.join('\n\n');
   }
 
   // ===== NPC Tracking =====
@@ -431,6 +524,8 @@ ${conversationText}`;
     this.stopAutoCompactCheck();
     this.npcStates.clear();
     this.playerDescription = null;
+    this.playerPrompt = null;
+    this.playerMemories.clear();
     this.removeAllListeners();
   }
 }

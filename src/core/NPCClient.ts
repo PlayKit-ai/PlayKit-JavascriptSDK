@@ -12,6 +12,7 @@
 import EventEmitter from 'eventemitter3';
 import { Message, NpcAction, NpcActionResponse, npcActionToTool } from '../types';
 import { ChatClient } from './ChatClient';
+import { AIContextManager } from './AIContextManager';
 import { Logger } from '../utils/Logger';
 
 /**
@@ -223,10 +224,11 @@ export class NPCClient extends EventEmitter {
   /**
    * Manually generate reply predictions based on current conversation.
    * Uses the fast model for quick generation.
+   * @param tempPrompt Optional temporary prompt to influence the prediction style/tone
    * @param count Number of predictions to generate (default: uses predictionCount property)
    * @returns Array of predicted player replies, or empty array on failure
    */
-  async generateReplyPredictions(count?: number): Promise<string[]> {
+  async generateReplyPredictions(tempPrompt?: string, count?: number): Promise<string[]> {
     const predictionNum = count ?? this.predictionCount;
 
     if (this.history.length < 2) {
@@ -251,13 +253,29 @@ export class NPCClient extends EventEmitter {
         .slice(-6)
         .map(m => `${m.role}: ${m.content}`);
 
+      // Get player context from AIContextManager
+      const contextManager = AIContextManager.getInstance();
+      const playerContext = contextManager.buildPlayerContext();
+
+      // Build player character section
+      let playerCharacterSection = '';
+      if (playerContext || tempPrompt) {
+        playerCharacterSection = '\nPlayer Character:\n';
+        if (playerContext) {
+          playerCharacterSection += playerContext + '\n';
+        }
+        if (tempPrompt) {
+          playerCharacterSection += `Additional guidance: ${tempPrompt}\n`;
+        }
+      }
+
       // Build prompt for prediction generation
       const prompt = `Based on the conversation history below, generate exactly ${predictionNum} natural and contextually appropriate responses that the player might say next.
 
 Context:
 - This is a conversation between a player and an NPC in a game
 - The NPC just said: "${lastNpcMessage}"
-
+${playerCharacterSection}
 Conversation history:
 ${recentHistory.join('\n')}
 
@@ -265,7 +283,7 @@ Requirements:
 1. Each response should be 1-2 sentences maximum
 2. Responses should be diverse in tone and intent
 3. Include a mix of questions, statements, and action-oriented responses
-4. Responses should feel natural for a player character
+4. Responses should feel natural for the player character${playerContext || tempPrompt ? ' and match their personality/tone' : ''}
 
 Output ONLY a JSON array of ${predictionNum} strings, nothing else:
 ["response1", "response2", "response3", "response4"]`;
