@@ -144,6 +144,11 @@ export interface DeviceAuthInitResult {
 }
 
 export class DeviceAuthFlowManager extends EventEmitter {
+  /** Shared promise for the current flow - allows multiple callers to await the same result */
+  private static currentFlowPromise: Promise<DeviceAuthResult> | null = null;
+  /** Reference to the currently active instance */
+  private static activeInstance: DeviceAuthFlowManager | null = null;
+
   private baseURL: string;
   private gameId: string;
   private pollInterval: number = 5000; // Default 5 seconds
@@ -209,6 +214,12 @@ export class DeviceAuthFlowManager extends EventEmitter {
    * @private
    */
   private showLoginModal(_gameInfo: GameInfo): { clicked: Promise<void>; cancelled: Promise<void> } {
+    // Remove any existing modal to prevent duplicates
+    const existingModal = document.getElementById('playkit-login-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
     let resolveClicked: () => void;
     let resolveCancelled: () => void;
 
@@ -455,12 +466,37 @@ export class DeviceAuthFlowManager extends EventEmitter {
    * @returns Promise resolving to DeviceAuthResult with tokens
    */
   async startFlow(options: DeviceAuthFlowOptions = {}): Promise<DeviceAuthResult> {
+    // If a flow is already in progress, return the shared promise so all callers get the same result
+    if (DeviceAuthFlowManager.currentFlowPromise) {
+      this.logger.debug('Device auth flow already in progress, waiting for existing flow');
+      return DeviceAuthFlowManager.currentFlowPromise;
+    }
+
+    // Store the flow promise so subsequent calls can await the same result
+    const flowPromise = this.executeFlow(options);
+    DeviceAuthFlowManager.currentFlowPromise = flowPromise;
+    DeviceAuthFlowManager.activeInstance = this;
+
+    try {
+      return await flowPromise;
+    } finally {
+      // Clean up static state when flow completes (success or failure)
+      DeviceAuthFlowManager.currentFlowPromise = null;
+      DeviceAuthFlowManager.activeInstance = null;
+    }
+  }
+
+  /**
+   * Internal method that executes the actual device auth flow
+   * @private
+   */
+  private async executeFlow(options: DeviceAuthFlowOptions = {}): Promise<DeviceAuthResult> {
     this.aborted = false;
     this.currentLanguage = this.detectLanguage();
     const scope = options.scope || 'player:play';
     const openBrowser = options.openBrowser || this.defaultOpenBrowser.bind(this);
 
-    // Generate PKCE parameters
+    // Generate PKCE parameters (outside try block so codeVerifier is accessible for polling)
     const codeVerifier = this.generateCodeVerifier();
     const codeChallenge = await this.generateCodeChallenge(codeVerifier);
 
@@ -488,6 +524,7 @@ export class DeviceAuthFlowManager extends EventEmitter {
     }
 
     const initData = await initResponse.json();
+
     const { session_id, auth_url, poll_interval, expires_in, game } = initData;
 
     // Update poll interval from server
@@ -663,6 +700,13 @@ export class DeviceAuthFlowManager extends EventEmitter {
     this.closeModal();
     this.cancel();
     this.removeAllListeners();
+  }
+
+  /**
+   * Check if a device auth flow is currently in progress (static method)
+   */
+  static isInProgress(): boolean {
+    return DeviceAuthFlowManager.currentFlowPromise !== null;
   }
 
   /**

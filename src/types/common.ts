@@ -144,6 +144,19 @@ export interface APIResult<T> {
 export type AuthMethod = 'device' | 'headless';
 
 /**
+ * Configuration for developerToken fallback behavior
+ * When developerToken authentication fails, the SDK can automatically
+ * fall back to player login flow.
+ */
+export interface DeveloperTokenFallbackConfig {
+  /**
+   * Whether to enable automatic fallback to player login when developerToken fails.
+   * Default: true
+   */
+  enabled?: boolean;
+}
+
+/**
  * SDK running mode
  * - 'browser': Default mode with UI support (login dialogs, indicators, etc.)
  * - 'server': Server/Node.js mode, disables UI-related features
@@ -169,6 +182,20 @@ export interface SDKConfig {
    * Useful for server-side usage where token is passed from client.
    */
   playerToken?: string;
+
+  /**
+   * Whether to auto-detect platform token from localStorage (same-domain scenario).
+   * When enabled, SDK will check localStorage for a token stored by the platform
+   * (e.g., Agentland-Space) and use it directly without triggering Device Auth.
+   * Default: true
+   */
+  autoDetectPlatformToken?: boolean;
+
+  /**
+   * localStorage key name for platform token detection.
+   * Default: 'shared_token'
+   */
+  platformTokenKey?: string;
 
   /** Base URL for API endpoints (optional, defaults to production) */
   baseURL?: string;
@@ -221,6 +248,29 @@ export interface SDKConfig {
    * ```
    */
   logging?: LogConfig;
+
+  /**
+   * Configuration for developerToken fallback behavior.
+   * When developerToken validation fails, the SDK can automatically
+   * fall back to player login flow.
+   *
+   * @example
+   * ```typescript
+   * // Default: fallback enabled
+   * const sdk = new PlayKitSDK({
+   *   gameId: 'your-game-id',
+   *   developerToken: 'my-token',
+   * });
+   *
+   * // Disable fallback
+   * const sdk = new PlayKitSDK({
+   *   gameId: 'your-game-id',
+   *   developerToken: 'my-token',
+   *   developerTokenFallback: { enabled: false },
+   * });
+   * ```
+   */
+  developerTokenFallback?: DeveloperTokenFallbackConfig;
 }
 
 /**

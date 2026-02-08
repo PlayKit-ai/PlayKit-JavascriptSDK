@@ -382,41 +382,40 @@ export class AuthFlowManager extends EventEmitter {
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.48);
-        backdrop-filter: blur(8px);
+        background: rgba(0, 0, 0, 0.8);
       }
 
       .playkit-auth-container {
         position: relative;
-        background: #FFFFFF;
-        border-radius: 4px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
         width: 90%;
-        max-width: 420px;
+        max-width: 320px;
         overflow: hidden;
       }
 
       .playkit-auth-panel {
-        padding: 40px 32px;
+        padding: 24px;
       }
 
       .playkit-auth-header {
         text-align: center;
-        margin-bottom: 32px;
+        margin-bottom: 20px;
         position: relative;
       }
 
       .playkit-auth-header h2 {
         margin: 0 0 8px 0;
-        font-size: 28px;
+        font-size: 14px;
         font-weight: 600;
-        color: #000000;
+        color: #171717;
       }
 
       .playkit-auth-header p {
         margin: 0;
         font-size: 14px;
-        color: #666666;
+        color: #666;
         line-height: 1.5;
       }
 
@@ -428,22 +427,20 @@ export class AuthFlowManager extends EventEmitter {
         border: none;
         cursor: pointer;
         padding: 4px;
-        border-radius: 2px;
-        color: #666666;
-        transition: background-color 0.15s ease, color 0.15s ease;
+        color: #666;
+        transition: background-color 0.2s ease, color 0.2s ease;
       }
 
       .playkit-back-button:hover {
-        background: #F6F6F6;
-        color: #000000;
+        background: #f5f5f5;
+        color: #171717;
       }
 
       .playkit-auth-toggle {
         display: flex;
-        background: #F6F6F6;
-        border-radius: 2px;
+        background: #f5f5f5;
         padding: 2px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         gap: 2px;
       }
 
@@ -453,9 +450,8 @@ export class AuthFlowManager extends EventEmitter {
         justify-content: center;
         align-items: center;
         padding: 10px 16px;
-        border-radius: 2px;
         cursor: pointer;
-        transition: background-color 0.15s ease;
+        transition: background-color 0.2s ease;
       }
 
       .playkit-toggle-option input {
@@ -465,20 +461,20 @@ export class AuthFlowManager extends EventEmitter {
       .playkit-toggle-option span {
         font-size: 14px;
         font-weight: 500;
-        color: #666666;
-        transition: color 0.15s ease;
+        color: #666;
+        transition: color 0.2s ease;
       }
 
       .playkit-toggle-option input:checked + span {
-        color: #FFFFFF;
+        color: #fff;
       }
 
       .playkit-toggle-option:has(input:checked) {
-        background: #276EF1;
+        background: #171717;
       }
 
       .playkit-auth-input-group {
-        margin-bottom: 24px;
+        margin-bottom: 20px;
       }
 
       .playkit-input-wrapper {
@@ -490,29 +486,27 @@ export class AuthFlowManager extends EventEmitter {
       .playkit-input-icon {
         position: absolute;
         left: 12px;
-        color: #999999;
+        color: #999;
         pointer-events: none;
       }
 
       .playkit-input-wrapper input {
         width: 100%;
-        padding: 12px 12px 12px 44px;
-        border: 1px solid #CCCCCC;
-        border-radius: 2px;
+        padding: 10px 12px 10px 44px;
+        border: 1px solid #e5e7eb;
         font-size: 14px;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        transition: border-color 0.2s ease;
         box-sizing: border-box;
-        background: #FFFFFF;
+        background: #fff;
       }
 
       .playkit-input-wrapper input:hover {
-        border-color: #999999;
+        border-color: #d4d4d4;
       }
 
       .playkit-input-wrapper input:focus {
         outline: none;
-        border-color: #276EF1;
-        box-shadow: 0 0 0 3px rgba(39, 110, 241, 0.1);
+        border-color: #171717;
       }
 
       .playkit-code-inputs {
@@ -522,16 +516,15 @@ export class AuthFlowManager extends EventEmitter {
       }
 
       .playkit-code-input {
-        width: 48px !important;
-        height: 56px;
+        width: 40px !important;
+        height: 48px;
         text-align: center;
-        font-size: 24px;
+        font-size: 20px;
         font-weight: 600;
-        border: 1px solid #CCCCCC !important;
-        border-radius: 2px;
+        border: 1px solid #e5e7eb !important;
         padding: 0 !important;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        background: #FFFFFF;
+        transition: border-color 0.2s ease;
+        background: #fff;
         -moz-appearance: textfield;
       }
 
@@ -542,48 +535,46 @@ export class AuthFlowManager extends EventEmitter {
       }
 
       .playkit-code-input:hover {
-        border-color: #999999 !important;
+        border-color: #d4d4d4 !important;
       }
 
       .playkit-code-input:focus {
         outline: none;
-        border-color: #276EF1 !important;
-        box-shadow: 0 0 0 3px rgba(39, 110, 241, 0.1);
+        border-color: #171717 !important;
       }
 
       .playkit-auth-button {
         width: 100%;
-        padding: 12px 16px;
-        background: #276EF1;
-        color: #FFFFFF;
+        padding: 10px 16px;
+        background: #171717;
+        color: white;
         border: none;
-        border-radius: 2px;
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        transition: background-color 0.15s ease;
+        transition: background 0.2s ease;
       }
 
       .playkit-auth-button:hover:not(:disabled) {
-        background: #174EB6;
+        background: #404040;
       }
 
       .playkit-auth-button:active:not(:disabled) {
-        background: #0F3A8A;
+        background: #0a0a0a;
       }
 
       .playkit-auth-button:disabled {
-        background: #CCCCCC;
+        background: #e5e7eb;
+        color: #999;
         cursor: not-allowed;
       }
 
       .playkit-auth-error {
         margin-top: 16px;
         padding: 12px 16px;
-        background: #FEF0F0;
-        border: 1px solid #FDD;
-        border-radius: 2px;
-        color: #CC3333;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
         font-size: 13px;
         text-align: left;
         display: none;
@@ -603,16 +594,15 @@ export class AuthFlowManager extends EventEmitter {
         display: flex;
         justify-content: center;
         align-items: center;
-        border-radius: 4px;
       }
 
       .playkit-spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid #F0F0F0;
-        border-top: 3px solid #276EF1;
+        width: 24px;
+        height: 24px;
+        border: 2px solid #e5e7eb;
+        border-top: 2px solid #171717;
         border-radius: 50%;
-        animation: playkit-spin 0.8s linear infinite;
+        animation: playkit-spin 1s linear infinite;
       }
 
       @keyframes playkit-spin {
@@ -624,17 +614,16 @@ export class AuthFlowManager extends EventEmitter {
         .playkit-auth-container {
           width: 95%;
           max-width: none;
-          border-radius: 2px;
         }
 
         .playkit-auth-panel {
-          padding: 32px 24px;
+          padding: 20px;
         }
 
         .playkit-code-input {
-          width: 40px !important;
-          height: 48px;
-          font-size: 20px;
+          width: 36px !important;
+          height: 44px;
+          font-size: 18px;
         }
 
         .playkit-code-inputs {

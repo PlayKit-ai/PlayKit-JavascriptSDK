@@ -3,7 +3,7 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { SDKConfig, PlayerInfo, TokenRefreshResult, SetNicknameResponse, PlayKitError } from '../types';
+import { SDKConfig, PlayerInfo, TokenRefreshResult, SetNicknameResponse, PlayKitError, DeveloperTokenFallbackConfig } from '../types';
 import type { DeviceAuthInitResult, DeviceAuthResult, TokenScope } from '../auth/DeviceAuthFlowManager';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from './PlayerClient';
@@ -31,6 +31,7 @@ export class PlayKitSDK extends EventEmitter {
   private initialized: boolean = false;
   private devTokenIndicator: HTMLDivElement | null = null;
   private logger: Logger;
+  private fallbackConfig: DeveloperTokenFallbackConfig;
 
   constructor(config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig }) {
     super();
@@ -44,6 +45,12 @@ export class PlayKitSDK extends EventEmitter {
     // Initialize logging system
     this.initializeLogging(this.config);
     this.logger = Logger.getLogger('PlayKitSDK');
+
+    // Initialize fallback configuration with defaults
+    this.fallbackConfig = {
+      enabled: true,
+      ...config.developerTokenFallback,
+    };
 
     // Initialize managers and providers
     this.authManager = new AuthManager(this.config);
@@ -113,7 +120,8 @@ export class PlayKitSDK extends EventEmitter {
       this.initialized = true;
 
       // Show developer token indicator if using developer token (browser mode only)
-      if (this.config.developerToken && this.config.mode !== 'server' && typeof window !== 'undefined') {
+      const isDeveloperTokenMode = this.authManager.isDeveloperTokenAuth();
+      if (isDeveloperTokenMode && this.config.mode !== 'server' && typeof window !== 'undefined') {
         this.showDeveloperTokenIndicator();
       }
 
@@ -123,21 +131,26 @@ export class PlayKitSDK extends EventEmitter {
           await this.playerClient.getPlayerInfo();
           this.logger.debug('Token validated and user info fetched');
         } catch (error) {
-          // If token is invalid, logout and restart auth flow
-          this.logger.error('Token validation failed:', error);
-          await this.authManager.logout();
-
-          // Auto-restart login flow in browser environment
-          if (typeof window !== 'undefined') {
-            this.logger.debug('Restarting authentication flow...');
-            const authMethod = this.config.authMethod || 'device';
-            await this.authManager.startAuthFlow(authMethod);
-
-            // Retry getting player info after re-authentication
-            await this.playerClient.getPlayerInfo();
-            this.logger.debug('Re-authentication successful, token validated');
+          // Check if this is a developerToken failure
+          if (isDeveloperTokenMode) {
+            await this.handleDeveloperTokenFailure(error);
           } else {
-            throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
+            // If token is invalid, logout and restart auth flow
+            this.logger.error('Token validation failed:', error);
+            await this.authManager.logout();
+
+            // Auto-restart login flow in browser environment
+            if (typeof window !== 'undefined') {
+              this.logger.debug('Restarting authentication flow...');
+              const authMethod = this.config.authMethod || 'device';
+              await this.authManager.startAuthFlow(authMethod);
+
+              // Retry getting player info after re-authentication
+              await this.playerClient.getPlayerInfo();
+              this.logger.debug('Re-authentication successful, token validated');
+            } else {
+              throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
+            }
           }
         }
       }
@@ -148,6 +161,60 @@ export class PlayKitSDK extends EventEmitter {
     } catch (error) {
       this.emit('error', error);
       throw error;
+    }
+  }
+
+  /**
+   * Handle developerToken authentication failure with optional fallback to player login.
+   * This is called when a developerToken is provided but fails validation.
+   *
+   * @param error - The error that caused the developerToken failure
+   */
+  private async handleDeveloperTokenFailure(error: unknown): Promise<void> {
+    const willFallback = this.fallbackConfig.enabled !== false &&
+                         typeof window !== 'undefined' &&
+                         this.config.mode !== 'server';
+
+    // Emit developer_token_failed event
+    this.emit('developer_token_failed', {
+      error,
+      willFallback,
+    });
+    this.logger.warn('DeveloperToken validation failed', { error, willFallback });
+
+    // Clear developer token state and indicator
+    this.authManager.clearDeveloperToken();
+    this.hideDeveloperTokenIndicator();
+
+    if (!willFallback) {
+      // Fallback disabled or not in browser - throw the error
+      throw new PlayKitError(
+        'DeveloperToken validation failed: ' + (error instanceof Error ? error.message : String(error)),
+        'DEVELOPER_TOKEN_INVALID'
+      );
+    }
+
+    // Emit fallback started event
+    const fallbackMethod = this.config.authMethod || 'device';
+    this.emit('developer_token_fallback_started', { fallbackMethod });
+    this.logger.debug('Starting fallback to player login', { fallbackMethod });
+
+    try {
+      // Start player login flow
+      await this.authManager.startAuthFlow(fallbackMethod);
+
+      // Verify the new token
+      await this.playerClient.getPlayerInfo();
+
+      // Emit fallback completed event
+      const authState = this.authManager.getAuthState();
+      this.emit('developer_token_fallback_completed', { authState });
+      this.logger.debug('DeveloperToken fallback completed successfully');
+    } catch (fallbackError) {
+      // Emit fallback failed event
+      this.emit('developer_token_fallback_failed', { error: fallbackError });
+      this.logger.error('DeveloperToken fallback failed', fallbackError);
+      throw fallbackError;
     }
   }
 

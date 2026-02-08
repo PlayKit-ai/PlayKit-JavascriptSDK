@@ -291,19 +291,19 @@ export class ExternalAuthFlowManager extends EventEmitter {
         display: flex;
         justify-content: center;
         align-items: center;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.8);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       `;
 
       // Create content card
       const card = document.createElement('div');
       card.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        padding: 32px;
-        max-width: 400px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 24px;
+        max-width: 320px;
         width: 90%;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
         text-align: center;
       `;
 
@@ -313,10 +313,10 @@ export class ExternalAuthFlowManager extends EventEmitter {
         icon.src = gameInfo.icon;
         icon.alt = gameInfo.name;
         icon.style.cssText = `
-          width: 80px;
-          height: 80px;
-          border-radius: 12px;
+          width: 64px;
+          height: 64px;
           margin: 0 auto 16px;
+          display: block;
         `;
         card.appendChild(icon);
       }
@@ -325,10 +325,10 @@ export class ExternalAuthFlowManager extends EventEmitter {
       const title = document.createElement('h2');
       title.textContent = gameInfo.name;
       title.style.cssText = `
-        font-size: 24px;
-        font-weight: bold;
+        font-size: 14px;
+        font-weight: 600;
         margin: 0 0 8px;
-        color: #1a1a1a;
+        color: #171717;
       `;
       card.appendChild(title);
 
@@ -339,7 +339,7 @@ export class ExternalAuthFlowManager extends EventEmitter {
         desc.style.cssText = `
           font-size: 14px;
           color: #666;
-          margin: 0 0 24px;
+          margin: 0 0 20px;
           line-height: 1.5;
         `;
         card.appendChild(desc);
@@ -350,27 +350,26 @@ export class ExternalAuthFlowManager extends EventEmitter {
       loginBtn.textContent = this.t('loginToPlay');
       loginBtn.style.cssText = `
         width: 100%;
-        padding: 12px 16px;
-        background: #276EF1;
-        color: #FFFFFF;
+        padding: 10px 16px;
+        background: #171717;
+        color: white;
         border: none;
-        border-radius: 2px;
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        transition: background-color 0.15s ease;
+        transition: background 0.2s ease;
       `;
       loginBtn.onmouseover = () => {
-        loginBtn.style.background = '#174EB6';
+        loginBtn.style.background = '#404040';
       };
       loginBtn.onmouseout = () => {
-        loginBtn.style.background = '#276EF1';
+        loginBtn.style.background = '#171717';
       };
       loginBtn.onmousedown = () => {
-        loginBtn.style.background = '#0F3A8A';
+        loginBtn.style.background = '#0a0a0a';
       };
       loginBtn.onmouseup = () => {
-        loginBtn.style.background = '#174EB6';
+        loginBtn.style.background = '#404040';
       };
 
       let clickResolve: () => void;
@@ -383,46 +382,62 @@ export class ExternalAuthFlowManager extends EventEmitter {
         card.innerHTML = '';
 
         // Show waiting message
-        const waitingTitle = document.createElement('h2');
-        waitingTitle.textContent = gameInfo.name;
-        waitingTitle.style.cssText = `
-          font-size: 24px;
-          font-weight: bold;
-          margin: 0 0 16px;
-          color: #1a1a1a;
-        `;
-        card.appendChild(waitingTitle);
-
         const waitingMessage = document.createElement('p');
         waitingMessage.textContent = this.t('loginInNewWindow');
         waitingMessage.style.cssText = `
-          font-size: 16px;
+          font-size: 14px;
           color: #666;
-          margin: 0 0 24px;
+          margin: 0 0 20px;
           line-height: 1.5;
         `;
         card.appendChild(waitingMessage);
+
+        // Loading spinner
+        const spinner = document.createElement('div');
+        spinner.style.cssText = `
+          width: 24px;
+          height: 24px;
+          margin: 0 auto 16px;
+          border: 2px solid #e5e7eb;
+          border-top-color: #171717;
+          border-radius: 50%;
+          animation: playkit-spin 1s linear infinite;
+        `;
+        card.appendChild(spinner);
+
+        // Add keyframes for spinner if not exists
+        if (!document.getElementById('playkit-spin-style')) {
+          const style = document.createElement('style');
+          style.id = 'playkit-spin-style';
+          style.textContent = `
+            @keyframes playkit-spin {
+              to { transform: rotate(360deg); }
+            }
+          `;
+          document.head.appendChild(style);
+        }
 
         // Cancel button
         const cancelBtn = document.createElement('button');
         cancelBtn.textContent = this.t('cancel');
         cancelBtn.style.cssText = `
           width: 100%;
-          padding: 12px 16px;
-          background: #E5E7EB;
-          color: #374151;
-          border: none;
-          border-radius: 2px;
+          padding: 10px 16px;
+          background: transparent;
+          color: #666;
+          border: 1px solid #e5e7eb;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          transition: background-color 0.15s ease;
+          transition: all 0.2s ease;
         `;
         cancelBtn.onmouseover = () => {
-          cancelBtn.style.background = '#D1D5DB';
+          cancelBtn.style.background = '#f5f5f5';
+          cancelBtn.style.borderColor = '#d4d4d4';
         };
         cancelBtn.onmouseout = () => {
-          cancelBtn.style.background = '#E5E7EB';
+          cancelBtn.style.background = 'transparent';
+          cancelBtn.style.borderColor = '#e5e7eb';
         };
         cancelBtn.onclick = () => {
           modal.remove();

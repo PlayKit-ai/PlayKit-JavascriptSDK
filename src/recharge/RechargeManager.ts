@@ -188,13 +188,13 @@ export class RechargeManager extends EventEmitter {
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.8);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 999999;
         animation: playkit-recharge-fadeIn 0.2s ease-out;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       @keyframes playkit-recharge-fadeIn {
@@ -207,140 +207,111 @@ export class RechargeManager extends EventEmitter {
       }
 
       .playkit-recharge-modal {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        padding: 32px;
-        max-width: 400px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
+        padding: 24px;
+        max-width: 320px;
         width: 90%;
         position: relative;
-        animation: playkit-recharge-slideUp 0.3s ease-out;
-      }
-
-      @keyframes playkit-recharge-slideUp {
-        from {
-          transform: translateY(20px);
-          opacity: 0;
-        }
-        to {
-          transform: translateY(0);
-          opacity: 1;
-        }
+        text-align: center;
       }
 
       .playkit-recharge-title {
-        font-size: 24px;
-        font-weight: bold;
-        color: #ffffff;
-        margin: 0 0 16px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0 0 8px 0;
         text-align: center;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-recharge-message {
-        font-size: 16px;
-        color: rgba(255, 255, 255, 0.9);
-        margin: 0 0 24px 0;
+        font-size: 14px;
+        color: #666;
+        margin: 0 0 20px 0;
         text-align: center;
         line-height: 1.5;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-recharge-balance {
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 12px;
+        background: #f5f5f5;
+        border: 1px solid #e5e7eb;
         padding: 16px;
-        margin: 0 0 24px 0;
+        margin: 0 0 20px 0;
         text-align: center;
-        backdrop-filter: blur(10px);
       }
 
       .playkit-recharge-balance-label {
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+        color: #666;
         margin: 0 0 8px 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-recharge-balance-value {
-        font-size: 32px;
+        font-size: 24px;
         font-weight: bold;
-        color: #ffffff;
+        color: #171717;
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-recharge-balance-unit {
-        font-size: 16px;
-        color: rgba(255, 255, 255, 0.8);
-        margin-left: 8px;
+        font-size: 14px;
+        color: #666;
+        margin-left: 4px;
       }
 
       .playkit-recharge-buttons {
         display: flex;
-        gap: 12px;
-        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
       }
 
       .playkit-recharge-button {
-        flex: 1;
-        padding: 12px 24px;
+        width: 100%;
+        padding: 10px 16px;
         border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 14px;
+        font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-recharge-button-primary {
-        background: #ffffff;
-        color: #667eea;
+        background: #171717;
+        color: white;
       }
 
       .playkit-recharge-button-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(255, 255, 255, 0.2);
+        background: #404040;
       }
 
       .playkit-recharge-button-primary:active {
-        transform: translateY(0);
+        background: #0a0a0a;
       }
 
       .playkit-recharge-button-secondary {
-        background: rgba(255, 255, 255, 0.15);
-        color: #ffffff;
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: transparent;
+        color: #666;
+        border: 1px solid #e5e7eb;
       }
 
       .playkit-recharge-button-secondary:hover {
-        background: rgba(255, 255, 255, 0.25);
+        background: #f5f5f5;
+        border-color: #d4d4d4;
       }
 
       .playkit-recharge-button-secondary:active {
-        background: rgba(255, 255, 255, 0.15);
+        background: #e5e5e5;
       }
 
       @media (max-width: 480px) {
         .playkit-recharge-modal {
-          padding: 24px;
-        }
-
-        .playkit-recharge-title {
-          font-size: 20px;
-        }
-
-        .playkit-recharge-message {
-          font-size: 14px;
-        }
-
-        .playkit-recharge-balance-value {
-          font-size: 28px;
-        }
-
-        .playkit-recharge-buttons {
-          flex-direction: column;
+          padding: 20px;
         }
       }
 
@@ -349,9 +320,9 @@ export class RechargeManager extends EventEmitter {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
         padding: 16px 20px;
         min-width: 240px;
         max-width: 320px;
@@ -360,6 +331,7 @@ export class RechargeManager extends EventEmitter {
         display: flex;
         align-items: flex-start;
         gap: 12px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
 
       .playkit-daily-refresh-toast.hiding {
@@ -391,7 +363,7 @@ export class RechargeManager extends EventEmitter {
       .playkit-toast-icon {
         width: 24px;
         height: 24px;
-        background: rgba(255, 255, 255, 0.2);
+        background: #171717;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -409,7 +381,7 @@ export class RechargeManager extends EventEmitter {
         flex: 1;
         font-size: 14px;
         font-weight: 500;
-        color: #ffffff;
+        color: #171717;
         line-height: 1.4;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }

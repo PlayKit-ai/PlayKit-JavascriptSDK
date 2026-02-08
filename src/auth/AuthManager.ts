@@ -23,6 +23,10 @@ export class AuthManager extends EventEmitter {
   private authFlowManager: AuthFlowManager | null = null;
   private deviceAuthFlowManager: DeviceAuthFlowManager | null = null;
   private logger = Logger.getLogger('AuthManager');
+  /** Shared promise for current device auth flow - allows multiple callers to await the same result */
+  private currentDeviceAuthFlowPromise: Promise<DeviceAuthResult> | null = null;
+  /** Shared promise for current auth flow (startAuthFlow) - allows multiple callers to await the same result */
+  private currentAuthFlowPromise: Promise<void> | null = null;
 
   constructor(config: SDKConfig) {
     super();
@@ -100,6 +104,23 @@ export class AuthManager extends EventEmitter {
       return;
     }
 
+    // Check for platform-injected token (same-domain scenario)
+    // This allows seamless auth when SDK runs in a context where the platform
+    // (e.g., Agentland-Space) has already stored a token in localStorage
+    if (this.config.autoDetectPlatformToken !== false && typeof window !== 'undefined') {
+      const platformToken = this.detectPlatformToken();
+      if (platformToken) {
+        this.logger.info('Platform token detected, using for authentication');
+        this.authState = {
+          isAuthenticated: true,
+          token: platformToken,
+          tokenType: 'player',
+        };
+        this.emit('authenticated', this.authState);
+        return;
+      }
+    }
+
     // Not authenticated - trigger auto-login UI
     this.emit('unauthenticated');
 
@@ -134,11 +155,28 @@ export class AuthManager extends EventEmitter {
    * @deprecated 'headless' authentication is deprecated and will be removed in v2.0. Use 'device' instead.
    */
   async startAuthFlow(authMethod: 'device' | 'headless' = 'device'): Promise<void> {
-    if (this.authFlowManager || this.deviceAuthFlowManager) {
-      // Already in progress
-      return;
+    // If a flow is already in progress, return the shared promise so all callers await the same result
+    if (this.currentAuthFlowPromise) {
+      this.logger.debug('Auth flow already in progress, waiting for existing flow');
+      return this.currentAuthFlowPromise;
     }
 
+    // Store the flow promise so subsequent calls can await the same result
+    const flowPromise = this.executeAuthFlow(authMethod);
+    this.currentAuthFlowPromise = flowPromise;
+
+    try {
+      return await flowPromise;
+    } finally {
+      this.currentAuthFlowPromise = null;
+    }
+  }
+
+  /**
+   * Internal method that executes the actual auth flow
+   * @private
+   */
+  private async executeAuthFlow(authMethod: 'device' | 'headless' = 'device'): Promise<void> {
     // Deprecation warning for headless auth
     if (authMethod === 'headless') {
       this.logger.warn(
@@ -275,6 +313,59 @@ export class AuthManager extends EventEmitter {
   }
 
   /**
+   * Check if current authentication is using developerToken
+   */
+  isDeveloperTokenAuth(): boolean {
+    return this.authState.tokenType === 'developer';
+  }
+
+  /**
+   * Clear developerToken authentication state.
+   * Used when falling back to player login after developerToken failure.
+   */
+  clearDeveloperToken(): void {
+    if (this.authState.tokenType === 'developer') {
+      this.authState = {
+        isAuthenticated: false,
+      };
+      // Also clear the developerToken from config to prevent re-use
+      this.config.developerToken = undefined;
+    }
+  }
+
+  /**
+   * Detect platform-injected token (for same-domain scenarios).
+   * Checks localStorage and window object for tokens stored by the platform.
+   *
+   * @returns Platform token if found, null otherwise
+   */
+  private detectPlatformToken(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      // Check localStorage with configured key
+      const key = this.config.platformTokenKey || 'shared_token';
+      const token = localStorage.getItem(key);
+
+      if (token) {
+        this.logger.debug(`Platform token found in localStorage[${key}]`);
+        return token;
+      }
+
+      // Also check window object for injected token
+      const windowToken = (window as { __PLAYKIT_PLATFORM_TOKEN__?: string }).__PLAYKIT_PLATFORM_TOKEN__;
+      if (windowToken) {
+        this.logger.debug('Platform token found in window.__PLAYKIT_PLATFORM_TOKEN__');
+        return windowToken;
+      }
+    } catch (error) {
+      this.logger.warn('Error detecting platform token:', error);
+    }
+
+    return null;
+  }
+
+  /**
    * Check if token is expired
    */
   isTokenExpired(): boolean {
@@ -375,10 +466,28 @@ export class AuthManager extends EventEmitter {
    * ```
    */
   async startDeviceAuthFlow(options: DeviceAuthFlowOptions = {}): Promise<DeviceAuthResult> {
-    if (this.deviceAuthFlowManager) {
-      throw new PlayKitError('Device auth flow already in progress', 'FLOW_IN_PROGRESS');
+    // If a flow is already in progress, return the shared promise so all callers get the same result
+    if (this.currentDeviceAuthFlowPromise) {
+      this.logger.debug('Device auth flow already in progress, waiting for existing flow');
+      return this.currentDeviceAuthFlowPromise;
     }
 
+    // Store the flow promise so subsequent calls can await the same result
+    const flowPromise = this.executeDeviceAuthFlow(options);
+    this.currentDeviceAuthFlowPromise = flowPromise;
+
+    try {
+      return await flowPromise;
+    } finally {
+      this.currentDeviceAuthFlowPromise = null;
+    }
+  }
+
+  /**
+   * Internal method that executes the actual device auth flow
+   * @private
+   */
+  private async executeDeviceAuthFlow(options: DeviceAuthFlowOptions = {}): Promise<DeviceAuthResult> {
     try {
       this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
 
@@ -437,10 +546,20 @@ export class AuthManager extends EventEmitter {
    * ```
    */
   async initiateDeviceAuth(scope: TokenScope = 'player:play'): Promise<DeviceAuthInitResult> {
-    if (!this.deviceAuthFlowManager) {
-      this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
+    // If there's an existing manager, clean it up first (allows restarting flow)
+    if (this.deviceAuthFlowManager) {
+      this.logger.debug('Cleaning up existing device auth manager before initiating new flow');
+      this.deviceAuthFlowManager.destroy();
     }
+    this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
     return this.deviceAuthFlowManager.initiateAuth(scope);
+  }
+
+  /**
+   * Check if an authentication flow is currently in progress
+   */
+  isAuthFlowInProgress(): boolean {
+    return !!(this.authFlowManager || this.deviceAuthFlowManager);
   }
 
   /**

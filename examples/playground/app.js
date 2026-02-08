@@ -24,6 +24,8 @@ const elements = {
   imageModel: document.getElementById('image-model'),
   initButton: document.getElementById('init-button'),
   logoutButton: document.getElementById('logout-button'),
+  headerLoginButton: document.getElementById('header-login-button'),
+  headerLogoutButton: document.getElementById('header-logout-button'),
   debugToggle: document.getElementById('debug-toggle'),
   statusIndicator: document.getElementById('status-indicator'),
   creditDisplay: document.getElementById('credit-display'),
@@ -291,10 +293,14 @@ function updateStatus(authenticated) {
     dot.className = 'w-3 h-3 bg-green-500 rounded-full';
     text.textContent = i18n.t('status.authenticated');
     elements.logoutButton.classList.remove('hidden');
+    elements.headerLoginButton.classList.add('hidden');
+    elements.headerLogoutButton.classList.remove('hidden');
   } else {
     dot.className = 'w-3 h-3 bg-red-500 rounded-full';
     text.textContent = i18n.t('status.notInitialized');
     elements.logoutButton.classList.add('hidden');
+    elements.headerLoginButton.classList.remove('hidden');
+    elements.headerLogoutButton.classList.add('hidden');
     elements.creditDisplay.style.display = 'none';
   }
 }

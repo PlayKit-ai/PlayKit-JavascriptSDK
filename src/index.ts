@@ -72,6 +72,7 @@ export type {
   SetNicknameRequest,
   SetNicknameResponse,
   PlayKitError,
+  DeveloperTokenFallbackConfig,
   // Chat types
   ChatConfig,
   ChatStreamConfig,

@@ -7,11 +7,14 @@
       "WebSearch",
       "WebFetch(domain:baseweb.design)",
       "Bash(cat:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(xargs:*)",
+      "Bash(wc:*)"
     ],
     "additionalDirectories": [
-      "D:\\Project\\DeveloperWorks-UnitySDK",
-      "D:\\Project\\Agentland-Developerworks"
+      "D:\\Project\\Agentland-Developerworks",
+      "D:\\Project\\DeveloperWorks-Document",
+      "D:\\Project\\Agentland-Space"
     ]
   }
 }

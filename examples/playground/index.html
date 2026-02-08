@@ -51,6 +51,22 @@
             <span class="w-3 h-3 bg-red-500 rounded-full"></span>
             <span class="text-sm text-gray-600" data-i18n="status.notInitialized">Not Initialized</span>
           </span>
+          <button
+            id="header-login-button"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-4 rounded-md transition-colors"
+            data-i18n="loginButton"
+            onclick="initializeSDK()"
+          >
+            Login
+          </button>
+          <button
+            id="header-logout-button"
+            class="bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-1.5 px-4 rounded-md transition-colors hidden"
+            data-i18n="logoutButton"
+            onclick="logout()"
+          >
+            Logout
+          </button>
           <select id="language-selector" class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
             <option value="en">English</option>
             <option value="zh">中文</option>
