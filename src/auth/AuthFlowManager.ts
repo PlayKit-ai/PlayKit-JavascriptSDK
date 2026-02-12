@@ -8,6 +8,7 @@
 
 import EventEmitter from 'eventemitter3';
 import { PlayKitError } from '../types';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 interface SendCodeRequest {
   identifier: string;
@@ -791,7 +792,7 @@ export class AuthFlowManager extends EventEmitter {
   private async sendVerificationCode(identifier: string, type: 'email' | 'phone'): Promise<boolean> {
     const response = await fetch(`${this.baseURL}/api/auth/send-code`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getSDKHeaders() },
       body: JSON.stringify({ identifier, type } as SendCodeRequest),
     });
 
@@ -819,7 +820,7 @@ export class AuthFlowManager extends EventEmitter {
 
     const response = await fetch(`${this.baseURL}/api/auth/verify-code`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getSDKHeaders() },
       body: JSON.stringify({
         sessionId: this.currentSessionId,
         code,
@@ -844,7 +845,9 @@ export class AuthFlowManager extends EventEmitter {
    */
   private async setDefaultAuthTypeByRegion(): Promise<void> {
     try {
-      const response = await fetch(`${this.baseURL}/api/reachability`);
+      const response = await fetch(`${this.baseURL}/api/reachability`, {
+        headers: { ...getSDKHeaders() },
+      });
 
       if (response.ok) {
         const data: Reachability = await response.json();

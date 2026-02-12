@@ -42,6 +42,7 @@ export default [
         preventAssignment: true,
         values: {
           '__PLAYKIT_BASE_URL__': JSON.stringify(PLAYKIT_BASE_URL),
+          '__SDK_VERSION__': JSON.stringify(packageJson.version),
         },
       }),
       resolve(),
@@ -73,6 +74,7 @@ export default [
         preventAssignment: true,
         values: {
           '__PLAYKIT_BASE_URL__': JSON.stringify(PLAYKIT_BASE_URL),
+          '__SDK_VERSION__': JSON.stringify(packageJson.version),
         },
       }),
       resolve(),

@@ -4,6 +4,7 @@
  */
 
 import { PlayKitError } from '../types';
+import { getSDKHeaders } from './sdkHeaders';
 
 // @ts-ignore - replaced at build time
 const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
@@ -92,6 +93,7 @@ export class TokenValidator {
   async validateToken(token: string, gameId?: string): Promise<ValidatedPlayerInfo> {
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
+      ...getSDKHeaders(),
     };
 
     if (gameId) {
@@ -135,6 +137,7 @@ export class TokenValidator {
   async verifyToken(token: string, gameId?: string): Promise<TokenVerificationResult> {
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
+      ...getSDKHeaders(),
     };
 
     if (gameId) {

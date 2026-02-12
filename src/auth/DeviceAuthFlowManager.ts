@@ -13,6 +13,7 @@ import EventEmitter from 'eventemitter3';
 import { PlayKitError } from '../types';
 import { Logger } from '../utils/Logger';
 import { getRandomBytes, sha256, base64URLEncode } from '../utils/CryptoUtils';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 export type TokenScope = 'player:play' | 'developer:full';
 
@@ -505,6 +506,7 @@ export class DeviceAuthFlowManager extends EventEmitter {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getSDKHeaders(),
       },
       body: JSON.stringify({
         game_id: this.gameId,
@@ -590,7 +592,8 @@ export class DeviceAuthFlowManager extends EventEmitter {
 
         try {
           const pollResponse = await fetch(
-            `${this.baseURL}/api/device-auth/poll?session_id=${encodeURIComponent(session_id)}&code_verifier=${encodeURIComponent(codeVerifier)}`
+            `${this.baseURL}/api/device-auth/poll?session_id=${encodeURIComponent(session_id)}&code_verifier=${encodeURIComponent(codeVerifier)}`,
+            { headers: { ...getSDKHeaders() } }
           );
 
           const pollData = await pollResponse.json();
@@ -737,6 +740,7 @@ export class DeviceAuthFlowManager extends EventEmitter {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getSDKHeaders(),
       },
       body: JSON.stringify({
         game_id: this.gameId,
@@ -822,7 +826,8 @@ export class DeviceAuthFlowManager extends EventEmitter {
 
         try {
           const pollResponse = await fetch(
-            `${this.baseURL}/api/device-auth/poll?session_id=${encodeURIComponent(sessionId)}&code_verifier=${encodeURIComponent(codeVerifier)}`
+            `${this.baseURL}/api/device-auth/poll?session_id=${encodeURIComponent(sessionId)}&code_verifier=${encodeURIComponent(codeVerifier)}`,
+            { headers: { ...getSDKHeaders() } }
           );
 
           const pollData = await pollResponse.json();

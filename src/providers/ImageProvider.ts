@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 const DEFAULT_BASE_URL = 'https://playkit.ai';
 
@@ -82,6 +83,7 @@ export class ImageProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });

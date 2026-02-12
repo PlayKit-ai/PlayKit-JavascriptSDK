@@ -5,6 +5,7 @@
 import { ChatConfig, ChatCompletionResponse, PlayKitError, SDKConfig, ChatTool, MessageContent } from '../types';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 /**
  * Helper to extract string from MessageContent
@@ -78,6 +79,7 @@ export class ChatProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
@@ -155,6 +157,7 @@ export class ChatProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
@@ -237,6 +240,7 @@ export class ChatProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
@@ -315,6 +319,7 @@ export class ChatProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
@@ -413,6 +418,7 @@ export class ChatProvider {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify(requestBody),
       });

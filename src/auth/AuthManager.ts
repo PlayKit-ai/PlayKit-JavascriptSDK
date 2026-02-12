@@ -9,6 +9,7 @@ import { TokenStorage } from './TokenStorage';
 import { AuthFlowManager } from './AuthFlowManager';
 import { DeviceAuthFlowManager, DeviceAuthFlowOptions, DeviceAuthResult, DeviceAuthInitResult, TokenScope } from './DeviceAuthFlowManager';
 import { Logger } from '../utils/Logger';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 // @ts-ignore - replaced at build time
 const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
@@ -249,6 +250,7 @@ export class AuthManager extends EventEmitter {
         headers: {
           Authorization: `Bearer ${jwt}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify({ gameId: this.config.gameId }),
       });
@@ -656,6 +658,7 @@ export class AuthManager extends EventEmitter {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify({
           refresh_token: this.authState.refreshToken,

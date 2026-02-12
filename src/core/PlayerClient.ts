@@ -8,6 +8,7 @@ import { AuthManager } from '../auth/AuthManager';
 import { RechargeManager } from '../recharge/RechargeManager';
 import { RechargeConfig } from '../types/recharge';
 import { Logger } from '../utils/Logger';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 const DEFAULT_BASE_URL = 'https://playkit.ai';
 const PLAYER_INFO_ENDPOINT = '/api/external/player-info';
@@ -50,6 +51,7 @@ export class PlayerClient extends EventEmitter {
       // Build headers with X-Game-Id to support Global Developer Token
       const headers: Record<string, string> = {
         Authorization: `Bearer ${token}`,
+        ...getSDKHeaders(),
       };
       if (this.gameId) {
         headers['X-Game-Id'] = this.gameId;
@@ -180,6 +182,7 @@ export class PlayerClient extends EventEmitter {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...getSDKHeaders(),
         },
         body: JSON.stringify({ nickname: trimmed }),
       });

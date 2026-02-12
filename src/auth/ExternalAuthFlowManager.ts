@@ -6,6 +6,7 @@
 import EventEmitter from 'eventemitter3';
 import { PlayKitError } from '../types';
 import { getRandomBytes, sha256, base64URLEncode } from '../utils/CryptoUtils';
+import { getSDKHeaders } from '../utils/sdkHeaders';
 
 interface I18nTranslations {
   loginToPlay: string;
@@ -265,7 +266,9 @@ export class ExternalAuthFlowManager extends EventEmitter {
    * @private
    */
   private async fetchGameInfo(): Promise<{ id: string; name: string; description: string | null; icon: string | null }> {
-    const response = await fetch(`${this.baseURL}/api/external-auth/game-info?game_id=${this.gameId}`);
+    const response = await fetch(`${this.baseURL}/api/external-auth/game-info?game_id=${this.gameId}`, {
+      headers: { ...getSDKHeaders() },
+    });
     if (!response.ok) {
       throw new PlayKitError('Failed to fetch game information', 'GAME_INFO_ERROR');
     }
@@ -466,6 +469,7 @@ export class ExternalAuthFlowManager extends EventEmitter {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getSDKHeaders(),
       },
       body: JSON.stringify({
         grant_type: 'authorization_code',
