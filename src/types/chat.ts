@@ -136,10 +136,12 @@ export interface ChatCompletionResponse {
  * Streaming chunk formats
  */
 export interface StreamChunk {
-  type: 'text-delta' | 'done' | 'error';
+  type: 'text-delta' | 'done' | 'finish' | 'abort' | 'error';
   id?: string;
   delta?: string;
   error?: string;
+  errorText?: string;
+  reason?: string;
 }
 
 // ===== NPC Action Types =====

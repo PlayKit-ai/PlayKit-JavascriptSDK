@@ -68,8 +68,19 @@ export class StreamParser {
                 yield text;
               }
 
-              if (parsed.type === 'done' || parsed.finish_reason) {
+              // Stream termination events
+              if (parsed.type === 'done' || parsed.type === 'finish' || parsed.finish_reason) {
                 return;
+              }
+
+              if (parsed.type === 'abort') {
+                // Server-side timeout or cancellation — treat as end of stream
+                return;
+              }
+
+              if (parsed.type === 'error') {
+                // Server-side error event — throw to trigger onError callback
+                throw new Error(parsed.errorText || parsed.error || 'Stream error');
               }
             } catch (error) {
               // If JSON parse fails, treat as plain text
