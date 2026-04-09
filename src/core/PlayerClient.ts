@@ -10,7 +10,8 @@ import { RechargeConfig } from '../types/recharge';
 import { Logger } from '../utils/Logger';
 import { getSDKHeaders } from '../utils/sdkHeaders';
 
-const DEFAULT_BASE_URL = 'https://playkit.ai';
+// @ts-ignore - replaced at build time
+const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
 const PLAYER_INFO_ENDPOINT = '/api/external/player-info';
 const SET_NICKNAME_ENDPOINT = '/api/external/set-game-player-nickname';
 
@@ -33,7 +34,7 @@ export class PlayerClient extends EventEmitter {
       autoShowBalanceModal: rechargeConfig.autoShowBalanceModal ?? true,
       balanceCheckInterval: rechargeConfig.balanceCheckInterval ?? 30000,
       checkBalanceAfterApiCall: rechargeConfig.checkBalanceAfterApiCall ?? true,
-      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://playkit.ai/recharge',
+      rechargePortalUrl: rechargeConfig.rechargePortalUrl || 'https://players.playkit.ai/recharge',
       showDailyRefreshToast: rechargeConfig.showDailyRefreshToast ?? true,
     };
   }

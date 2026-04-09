@@ -12,7 +12,8 @@ import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
 import { getSDKHeaders } from '../utils/sdkHeaders';
 
-const DEFAULT_BASE_URL = 'https://playkit.ai';
+// @ts-ignore - replaced at build time
+const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
 
 export class ImageProvider {
   private authManager: AuthManager;

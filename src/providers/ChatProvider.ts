@@ -26,7 +26,8 @@ export interface ChatConfigWithTools extends ChatConfig {
   tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
 }
 
-const DEFAULT_BASE_URL = 'https://playkit.ai';
+// @ts-ignore - replaced at build time
+const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
 
 export class ChatProvider {
   private authManager: AuthManager;

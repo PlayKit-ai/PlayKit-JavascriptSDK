@@ -27,7 +27,7 @@ export interface RechargeConfig {
 
   /**
    * Base URL for the recharge portal
-   * @default 'https://playkit.ai/recharge'
+   * @default 'https://players.playkit.ai/recharge'
    */
   rechargePortalUrl?: string;
 

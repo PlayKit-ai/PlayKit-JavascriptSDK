@@ -69,7 +69,7 @@ export class RechargeManager extends EventEmitter {
 
   constructor(
     playerToken: string,
-    rechargePortalUrl: string = 'https://playkit.ai/recharge',
+    rechargePortalUrl: string = 'https://players.playkit.ai/recharge',
     gameId?: string
   ) {
     super();
