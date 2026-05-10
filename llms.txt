@@ -136,14 +136,30 @@ Can be integrated into Phaser scenes and game states
 Works alongside PixiJS applications
 
 ### Vanilla JS
-Available via UMD bundle at https://unpkg.com/playkit-sdk@latest/dist/index.umd.js
+Available via UMD bundle at https://unpkg.com/playkit-sdk@latest/dist/playkit-sdk.umd.js
+
+When loaded as UMD, the SDK is exposed on `window.PlayKitSDK`:
+
+```html
+<script src="https://unpkg.com/playkit-sdk@latest/dist/playkit-sdk.umd.js"></script>
+<script>
+  // Recommended: window.PlayKitSDK is the constructor.
+  const sdk = new PlayKitSDK({ gameId, developerToken });
+
+  // Legacy v1.x form is preserved as a self-reference and still works:
+  // const sdk = new PlayKitSDK.PlayKitSDK({ gameId, developerToken });
+
+  // Other named exports are attached as static properties:
+  // PlayKitSDK.ChatClient, PlayKitSDK.NPCClient, PlayKitSDK.AuthManager, ...
+</script>
+```
 
 ## Build Output
 
-- `dist/index.esm.js` - ES module
-- `dist/index.cjs.js` - CommonJS module
-- `dist/index.umd.js` - UMD bundle for browsers
-- `dist/index.d.ts` - TypeScript definitions
+- `dist/playkit-sdk.esm.js` - ES module
+- `dist/playkit-sdk.cjs.js` - CommonJS module
+- `dist/playkit-sdk.umd.js` - UMD bundle for browsers (global: `window.PlayKitSDK`, callable class)
+- `dist/playkit-sdk.d.ts` - TypeScript definitions (includes `Window.PlayKitSDK` ambient type)
 
 ## Development
 

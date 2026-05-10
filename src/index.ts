@@ -120,3 +120,15 @@ export type { LogEntry, LogHandler, LogConfig } from './utils/Logger';
 
 // Default export
 export { PlayKitSDK as default } from './core/PlayKitSDK';
+
+// Ambient global for the UMD bundle.
+// Loading dist/playkit-sdk.umd.js puts the SDK on window.PlayKitSDK as a
+// callable class. `PlayKitSDK.PlayKitSDK` self-reference is preserved so
+// v1.x code (`new window.PlayKitSDK.PlayKitSDK(cfg)`) keeps working.
+declare global {
+  interface Window {
+    PlayKitSDK: typeof import('./core/PlayKitSDK').PlayKitSDK & {
+      PlayKitSDK: typeof import('./core/PlayKitSDK').PlayKitSDK;
+    };
+  }
+}

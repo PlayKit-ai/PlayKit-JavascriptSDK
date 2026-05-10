@@ -56,15 +56,18 @@ export default [
   },
 
   // UMD build for browsers
+  // Uses a dedicated entry that makes window.PlayKitSDK both:
+  //   - directly callable: new PlayKitSDK(cfg)
+  //   - a namespace: PlayKitSDK.ChatClient, PlayKitSDK.PlayKitSDK (legacy)
   {
-    input: 'src/index.ts',
+    input: 'src/umd-entry.ts',
     output: {
       file: packageJson.browser,
       format: 'umd',
       name: 'PlayKitSDK',
       sourcemap: true,
       banner,
-      exports: 'named',
+      exports: 'default',
       globals: {
         eventemitter3: 'EventEmitter3',
       },

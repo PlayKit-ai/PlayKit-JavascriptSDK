@@ -6,6 +6,7 @@ import { ChatConfig, ChatCompletionResponse, PlayKitError, SDKConfig, ChatTool, 
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
 import { getSDKHeaders } from '../utils/sdkHeaders';
+import { assertValidMessages } from '../utils/validateMessages';
 
 /**
  * Helper to extract string from MessageContent
@@ -52,6 +53,8 @@ export class ChatProvider {
    * Make a chat completion request (non-streaming)
    */
   async chatCompletion(chatConfig: ChatConfig): Promise<ChatCompletionResponse> {
+    assertValidMessages(chatConfig.messages);
+
     // Ensure token is valid, auto-refresh if needed (browser mode only)
     await this.authManager.ensureValidToken();
 
@@ -130,6 +133,8 @@ export class ChatProvider {
   async chatCompletionStream(
     chatConfig: ChatConfig
   ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    assertValidMessages(chatConfig.messages);
+
     // Ensure token is valid, auto-refresh if needed (browser mode only)
     await this.authManager.ensureValidToken();
 
@@ -208,6 +213,8 @@ export class ChatProvider {
    * Make a chat completion request with tools (non-streaming)
    */
   async chatCompletionWithTools(chatConfig: ChatConfigWithTools): Promise<ChatCompletionResponse> {
+    assertValidMessages(chatConfig.messages);
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
@@ -287,6 +294,8 @@ export class ChatProvider {
   async chatCompletionWithToolsStream(
     chatConfig: ChatConfigWithTools
   ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    assertValidMessages(chatConfig.messages);
+
     const token = this.authManager.getToken();
     if (!token) {
       throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');

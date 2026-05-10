@@ -178,7 +178,7 @@ function draw() {
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://unpkg.com/playkit-sdk@latest/dist/index.umd.js"></script>
+  <script src="https://unpkg.com/playkit-sdk@latest/dist/playkit-sdk.umd.js"></script>
 </head>
 <body>
   <div id="output"></div>
@@ -189,7 +189,9 @@ function draw() {
     let sdk, chat;
 
     async function init() {
-      sdk = new PlayKitSDK.PlayKitSDK({
+      // window.PlayKitSDK is the constructor itself.
+      // Legacy form `new PlayKitSDK.PlayKitSDK({ ... })` still works for v1.x BC.
+      sdk = new PlayKitSDK({
         gameId: 'your-game-id',
         developerToken: 'your-dev-token'
       });
