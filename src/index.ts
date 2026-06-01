@@ -16,6 +16,7 @@ export type {
 } from './core/ChatClient';
 export { ImageClient } from './core/ImageClient';
 export { TranscriptionClient } from './core/TranscriptionClient';
+export { TTSClient } from './core/TTSClient';
 export { NPCClient } from './core/NPCClient';
 export type { NPCConfig, ConversationSaveData, MemoryEntry } from './core/NPCClient';
 export { PlayerClient } from './core/PlayerClient';
@@ -91,6 +92,10 @@ export type {
   TranscriptionOptions,
   TranscriptionResult,
   TranscriptionSegment,
+  // TTS types
+  TTSConfig,
+  TTSOptions,
+  TTSResult,
 } from './types';
 
 // Recharge types

@@ -10,9 +10,11 @@ import { PlayerClient } from './PlayerClient';
 import { ChatProvider } from '../providers/ChatProvider';
 import { ImageProvider } from '../providers/ImageProvider';
 import { TranscriptionProvider } from '../providers/TranscriptionProvider';
+import { TTSProvider } from '../providers/TTSProvider';
 import { ChatClient } from './ChatClient';
 import { ImageClient } from './ImageClient';
 import { TranscriptionClient } from './TranscriptionClient';
+import { TTSClient } from './TTSClient';
 import { NPCClient, NPCConfig } from './NPCClient';
 import { RechargeConfig } from '../types/recharge';
 import { AIContextManager, AIContextManagerConfig } from './AIContextManager';
@@ -26,6 +28,7 @@ export class PlayKitSDK extends EventEmitter {
   private chatProvider: ChatProvider;
   private imageProvider: ImageProvider;
   private transcriptionProvider: TranscriptionProvider;
+  private ttsProvider: TTSProvider;
   private contextManager: AIContextManager;
   private schemaLibrary: SchemaLibrary;
   private initialized: boolean = false;
@@ -58,11 +61,13 @@ export class PlayKitSDK extends EventEmitter {
     this.chatProvider = new ChatProvider(this.authManager, this.config);
     this.imageProvider = new ImageProvider(this.authManager, this.config);
     this.transcriptionProvider = new TranscriptionProvider(this.authManager, this.config);
+    this.ttsProvider = new TTSProvider(this.authManager, this.config);
 
     // Connect providers to player client for balance checking
     this.chatProvider.setPlayerClient(this.playerClient);
     this.imageProvider.setPlayerClient(this.playerClient);
     this.transcriptionProvider.setPlayerClient(this.playerClient);
+    this.ttsProvider.setPlayerClient(this.playerClient);
 
     // Initialize AI context manager
     this.contextManager = new AIContextManager(this.config.aiContext);
@@ -348,6 +353,15 @@ export class PlayKitSDK extends EventEmitter {
   createTranscriptionClient(model?: string): TranscriptionClient {
     this.ensureInitialized();
     return new TranscriptionClient(this.transcriptionProvider, model || this.config.defaultTranscriptionModel);
+  }
+
+  /**
+   * Create a TTS client for text-to-speech
+   * @param model - TTS model to use (default: 'default-tts-model')
+   */
+  createTTSClient(model?: string): TTSClient {
+    this.ensureInitialized();
+    return new TTSClient(this.ttsProvider, model || this.config.defaultTTSModel);
   }
 
   /**

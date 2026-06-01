@@ -225,6 +225,9 @@ export interface SDKConfig {
   /** Default transcription model to use */
   defaultTranscriptionModel?: string;
 
+  /** Default text-to-speech model to use */
+  defaultTTSModel?: string;
+
   /**
    * Enable debug logging
    * @deprecated Use `logging.level` instead. Will be removed in v2.0.

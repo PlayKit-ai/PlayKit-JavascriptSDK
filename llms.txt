@@ -44,6 +44,8 @@ await sdk.initialize();
 - **PlayKitSDK** (`src/core/PlayKitSDK.ts`) - Main SDK entry point
 - **ChatClient** (`src/core/ChatClient.ts`) - Text generation client
 - **ImageClient** (`src/core/ImageClient.ts`) - Image generation client
+- **TranscriptionClient** (`src/core/TranscriptionClient.ts`) - Audio-to-text (STT) client
+- **TTSClient** (`src/core/TTSClient.ts`) - Text-to-speech (TTS) client
 - **NPCClient** (`src/core/NPCClient.ts`) - NPC conversation manager
 - **PlayerClient** (`src/core/PlayerClient.ts`) - Player info and balance management
 
@@ -88,6 +90,16 @@ await chat.chatStream(
 const imageClient = sdk.createImageClient('dall-e-3');
 const image = await imageClient.generate('A futuristic city');
 const imgElement = await image.toHTMLImage();
+```
+
+### Text-to-Speech
+
+```typescript
+const tts = sdk.createTTSClient(); // 'default-tts-model'
+const result = await tts.synthesize({ text: 'Hello, adventurer!', voice: 'male-qn-qingse' });
+// result.audio is an ArrayBuffer; result.usageCharacters / result.audioLengthMs are metadata
+const url = await tts.synthesizeToObjectURL({ text: 'Welcome!' }); // browser playback
+new Audio(url).play();
 ```
 
 ### NPC Conversations

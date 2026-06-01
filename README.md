@@ -83,6 +83,26 @@ const imgElement = await image.toHTMLImage();
 document.body.appendChild(imgElement);
 ```
 
+### Text-to-Speech (TTS)
+
+```typescript
+const tts = sdk.createTTSClient(); // defaults to 'default-tts-model'
+
+// Get raw audio bytes plus usage metadata
+const result = await tts.synthesize({
+  text: 'Welcome to the game, brave adventurer!',
+  voice: 'male-qn-qingse',
+  format: 'mp3',
+});
+console.log('Characters billed:', result.usageCharacters);
+console.log('Audio length (ms):', result.audioLengthMs);
+
+// Or get a playable object URL directly (browser)
+const url = await tts.synthesizeToObjectURL({ text: 'Hello there!' });
+const audio = new Audio(url);
+audio.play();
+```
+
 ### NPC Conversations
 
 ```typescript
