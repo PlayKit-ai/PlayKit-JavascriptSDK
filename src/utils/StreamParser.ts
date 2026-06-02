@@ -18,13 +18,22 @@ function createDecoder(): { decode: (data: Uint8Array, options?: { stream?: bool
   };
 }
 
+/**
+ * A parsed part of the stream — either generated text or reasoning (thinking) text.
+ */
+export interface StreamPart {
+  kind: 'text' | 'reasoning';
+  delta: string;
+}
+
 export class StreamParser {
   /**
    * Parse SSE stream using ReadableStream
+   * Yields typed parts so callers can separate text from reasoning.
    */
   static async *parseStream(
     reader: ReadableStreamDefaultReader<Uint8Array>
-  ): AsyncGenerator<string, void, unknown> {
+  ): AsyncGenerator<StreamPart, void, unknown> {
     const decoder = createDecoder();
     let buffer = '';
 
@@ -62,10 +71,10 @@ export class StreamParser {
 
             try {
               const parsed = JSON.parse(data);
-              const text = this.extractTextFromChunk(parsed);
+              const part = this.extractPartFromChunk(parsed);
 
-              if (text) {
-                yield text;
+              if (part) {
+                yield part;
               }
 
               // Stream termination events
@@ -84,7 +93,7 @@ export class StreamParser {
               }
             } catch (error) {
               // If JSON parse fails, treat as plain text
-              yield data;
+              yield { kind: 'text', delta: data };
             }
           }
         }
@@ -95,23 +104,36 @@ export class StreamParser {
   }
 
   /**
-   * Extract text from a stream chunk
-   * Supports multiple formats (UI Message Stream and OpenAI)
+   * Extract a typed part (text or reasoning) from a stream chunk
+   * Supports multiple formats (UI Message Stream and OpenAI).
+   * Reasoning is detected before the generic text fallback so thinking
+   * deltas never leak into the text stream.
    */
-  private static extractTextFromChunk(chunk: any): string | null {
-    // UI Message Stream format: { type: "text-delta", delta: "..." }
+  private static extractPartFromChunk(chunk: any): StreamPart | null {
+    // UI Message Stream reasoning: { type: "reasoning-delta", delta: "..." }
+    if (chunk.type === 'reasoning-delta' && chunk.delta) {
+      return { kind: 'reasoning', delta: chunk.delta };
+    }
+
+    // UI Message Stream text: { type: "text-delta", delta: "..." }
     if (chunk.type === 'text-delta' && chunk.delta) {
-      return chunk.delta;
+      return { kind: 'text', delta: chunk.delta };
     }
 
-    // OpenAI format: { choices: [{ delta: { content: "..." } }] }
+    // OpenAI reasoning (defensive): { choices: [{ delta: { reasoning_content: "..." } }] }
+    if (chunk.choices && chunk.choices[0]?.delta?.reasoning_content) {
+      return { kind: 'reasoning', delta: chunk.choices[0].delta.reasoning_content };
+    }
+
+    // OpenAI text: { choices: [{ delta: { content: "..." } }] }
     if (chunk.choices && chunk.choices[0]?.delta?.content) {
-      return chunk.choices[0].delta.content;
+      return { kind: 'text', delta: chunk.choices[0].delta.content };
     }
 
-    // Direct delta format
+    // Direct delta format (text)
     if (chunk.delta) {
-      return typeof chunk.delta === 'string' ? chunk.delta : chunk.delta.content || null;
+      const text = typeof chunk.delta === 'string' ? chunk.delta : chunk.delta.content || null;
+      return text ? { kind: 'text', delta: text } : null;
     }
 
     return null;
@@ -125,8 +147,10 @@ export class StreamParser {
   ): Promise<string> {
     let fullText = '';
 
-    for await (const chunk of this.parseStream(reader)) {
-      fullText += chunk;
+    for await (const part of this.parseStream(reader)) {
+      if (part.kind === 'text') {
+        fullText += part.delta;
+      }
     }
 
     return fullText;
@@ -134,19 +158,27 @@ export class StreamParser {
 
   /**
    * Stream with callbacks
+   * Text deltas go to onChunk; reasoning (thinking) deltas go to onReasoning.
    */
   static async streamWithCallbacks(
     reader: ReadableStreamDefaultReader<Uint8Array>,
     onChunk: (chunk: string) => void,
     onComplete?: (fullText: string) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    onReasoning?: (chunk: string) => void
   ): Promise<void> {
     let fullText = '';
 
     try {
-      for await (const chunk of this.parseStream(reader)) {
-        fullText += chunk;
-        onChunk(chunk);
+      for await (const part of this.parseStream(reader)) {
+        if (part.kind === 'reasoning') {
+          if (onReasoning) {
+            onReasoning(part.delta);
+          }
+          continue;
+        }
+        fullText += part.delta;
+        onChunk(part.delta);
       }
 
       if (onComplete) {

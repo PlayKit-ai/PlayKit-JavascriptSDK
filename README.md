@@ -68,6 +68,33 @@ await chat.chatStream(
 );
 ```
 
+### Reasoning (Thinking)
+
+Reasoning-capable models can think before answering. Enable it with the
+`thinking` option (set the `effort` level) and read the model's reasoning
+separately from its answer.
+
+```typescript
+// Non-streaming: reasoning is returned on `result.reasoning`
+const result = await chat.textGeneration({
+  messages: [{ role: 'user', content: 'Solve: 17 * 24, show your work.' }],
+  thinking: { effort: 'high' },
+});
+
+console.log('Answer:', result.content);
+console.log('Reasoning:', result.reasoning);
+
+// Streaming: reasoning arrives via the `onReasoning` callback,
+// kept separate from the answer text in `onChunk`
+await chat.textGenerationStream({
+  messages: [{ role: 'user', content: 'Solve: 17 * 24, show your work.' }],
+  thinking: { effort: 'high' },
+  onReasoning: (chunk) => process.stdout.write(`[thinking] ${chunk}`),
+  onChunk: (chunk) => process.stdout.write(chunk),
+  onComplete: (fullText) => console.log('\nComplete:', fullText),
+});
+```
+
 ### Image Generation
 
 ```typescript
@@ -255,6 +282,10 @@ This SDK is proprietary software owned by Agentland Lab. Use of this SDK is subj
 - Issues: [GitHub Issues](https://github.com/cnqdztp/PlayKit-JavascriptSDK/issues)
 
 ## Changelog
+
+### 1.4.0-beta.3
+- Added `thinking` reasoning-effort option on chat (`thinking: { effort: 'high' }`)
+- Surface model reasoning: `result.reasoning` (non-streaming) and the `onReasoning` callback (streaming)
 
 ### 1.0.0-beta.1
 - Initial public beta release

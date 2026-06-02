@@ -31,6 +31,7 @@ export interface ChatWithToolsConfig extends ChatConfig {
  */
 export interface ChatWithToolsStreamConfig extends ChatWithToolsConfig {
   onChunk: (chunk: string) => void;
+  onReasoning?: (chunk: string) => void;
   onComplete?: (result: ChatResult) => void;
   onError?: (error: Error) => void;
 }
@@ -163,6 +164,7 @@ export class ChatClient {
         : undefined,
       id: response.id,
       created: response.created,
+      reasoning: choice.message.reasoning_content,
     };
   }
 
@@ -181,7 +183,8 @@ export class ChatClient {
       reader,
       config.onChunk,
       config.onComplete,
-      config.onError
+      config.onError,
+      config.onReasoning
     );
   }
 
@@ -441,6 +444,7 @@ export class ChatClient {
       id: response.id,
       created: response.created,
       tool_calls: choice.message.tool_calls,
+      reasoning: choice.message.reasoning_content,
     };
   }
 
@@ -457,6 +461,7 @@ export class ChatClient {
     const reader = await this.provider.chatCompletionWithToolsStream(chatConfig);
 
     let fullContent = '';
+    let fullReasoning = '';
     let toolCalls: ToolCall[] = [];
 
     await StreamParser.streamWithCallbacks(
@@ -473,10 +478,15 @@ export class ChatClient {
             model: chatConfig.model || this.model,
             finishReason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+            reasoning: fullReasoning || undefined,
           });
         }
       },
-      config.onError
+      config.onError,
+      (chunk) => {
+        fullReasoning += chunk;
+        config.onReasoning?.(chunk);
+      }
     );
   }
 }

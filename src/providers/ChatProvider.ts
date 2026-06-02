@@ -66,7 +66,7 @@ export class ChatProvider {
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
     const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
-    const requestBody = {
+    const requestBody: Record<string, any> = {
       model,
       messages: chatConfig.messages,
       temperature: chatConfig.temperature ?? 0.7,
@@ -76,6 +76,10 @@ export class ChatProvider {
       stop: chatConfig.stop || null,
       top_p: chatConfig.topP || null,
     };
+
+    if (chatConfig.thinking) {
+      requestBody.thinking = chatConfig.thinking;
+    }
 
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -146,7 +150,7 @@ export class ChatProvider {
     const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
     const endpoint = `/ai/${this.config.gameId}/v2/chat`;
 
-    const requestBody = {
+    const requestBody: Record<string, any> = {
       model,
       messages: chatConfig.messages,
       temperature: chatConfig.temperature ?? 0.7,
@@ -156,6 +160,10 @@ export class ChatProvider {
       stop: chatConfig.stop || null,
       top_p: chatConfig.topP || null,
     };
+
+    if (chatConfig.thinking) {
+      requestBody.thinking = chatConfig.thinking;
+    }
 
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -241,6 +249,9 @@ export class ChatProvider {
     if (chatConfig.tool_choice) {
       requestBody.tool_choice = chatConfig.tool_choice;
     }
+    if (chatConfig.thinking) {
+      requestBody.thinking = chatConfig.thinking;
+    }
 
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -321,6 +332,9 @@ export class ChatProvider {
     }
     if (chatConfig.tool_choice) {
       requestBody.tool_choice = chatConfig.tool_choice;
+    }
+    if (chatConfig.thinking) {
+      requestBody.thinking = chatConfig.thinking;
     }
 
     try {

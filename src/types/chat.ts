@@ -46,6 +46,14 @@ export interface ChatConfig {
 
   /** Tool choice: 'auto', 'required', 'none', or specific tool */
   tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
+
+  /** Reasoning effort for thinking-capable models */
+  thinking?: {
+    /** Whether thinking is enabled */
+    enabled?: boolean;
+    /** Reasoning effort level */
+    effort?: 'minimal' | 'low' | 'medium' | 'high' | 'max';
+  };
 }
 
 /**
@@ -54,6 +62,9 @@ export interface ChatConfig {
 export interface ChatStreamConfig extends ChatConfig {
   /** Callback for each chunk of text */
   onChunk: (chunk: string) => void;
+
+  /** Callback for each chunk of reasoning (thinking) text */
+  onReasoning?: (chunk: string) => void;
 
   /** Callback when generation is complete */
   onComplete?: (fullText: string) => void;
@@ -90,6 +101,9 @@ export interface ChatResult {
 
   /** Tool calls made by the model */
   tool_calls?: ToolCall[];
+
+  /** Model's reasoning (thinking) content, present only when the model produced thinking */
+  reasoning?: string;
 }
 
 /**
@@ -122,7 +136,7 @@ export interface ChatCompletionResponse {
   model: string;
   choices: Array<{
     index: number;
-    message: Message;
+    message: Message & { reasoning_content?: string };
     finish_reason: string;
   }>;
   usage?: {
@@ -136,7 +150,15 @@ export interface ChatCompletionResponse {
  * Streaming chunk formats
  */
 export interface StreamChunk {
-  type: 'text-delta' | 'done' | 'finish' | 'abort' | 'error';
+  type:
+    | 'text-delta'
+    | 'reasoning-delta'
+    | 'reasoning-start'
+    | 'reasoning-end'
+    | 'done'
+    | 'finish'
+    | 'abort'
+    | 'error';
   id?: string;
   delta?: string;
   error?: string;
