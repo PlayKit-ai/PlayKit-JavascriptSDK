@@ -96,6 +96,12 @@ export type {
   TTSConfig,
   TTSOptions,
   TTSResult,
+  TTSTimestampsConfig,
+  TTSTimestampsResult,
+  Alignment,
+  AlignmentItem,
+  VoiceMixEntry,
+  VoiceSettings,
 } from './types';
 
 // Recharge types

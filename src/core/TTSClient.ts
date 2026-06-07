@@ -5,6 +5,8 @@
 import {
   TTSConfig,
   TTSResult,
+  TTSTimestampsConfig,
+  TTSTimestampsResult,
   PlayKitError,
 } from '../types';
 import { TTSProvider } from '../providers/TTSProvider';
@@ -60,6 +62,20 @@ export class TTSClient {
    */
   async synthesize(config: TTSConfig): Promise<TTSResult> {
     return this.provider.synthesize({
+      ...config,
+      model: config.model || this.model,
+    });
+  }
+
+  /**
+   * Synthesize text into speech AND return timestamp alignment (word/sentence
+   * timings). Returns the audio bytes plus an `alignment` object.
+   * @param config - TTS configuration; `granularity` defaults to 'word'.
+   */
+  async synthesizeWithTimestamps(
+    config: TTSTimestampsConfig
+  ): Promise<TTSTimestampsResult> {
+    return this.provider.synthesizeWithTimestamps({
       ...config,
       model: config.model || this.model,
     });
