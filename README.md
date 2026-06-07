@@ -283,7 +283,8 @@ This SDK is proprietary software owned by Agentland Lab. Use of this SDK is subj
 
 ## Changelog
 
-### 1.4.0-beta.3
+### 1.4.0
+- Added text-to-speech (TTS) client
 - Added `thinking` reasoning-effort option on chat (`thinking: { effort: 'high' }`)
 - Surface model reasoning: `result.reasoning` (non-streaming) and the `onReasoning` callback (streaming)
 
