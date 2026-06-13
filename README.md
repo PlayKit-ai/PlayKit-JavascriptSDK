@@ -128,6 +128,13 @@ console.log('Audio length (ms):', result.audioLengthMs);
 const url = await tts.synthesizeToObjectURL({ text: 'Hello there!' });
 const audio = new Audio(url);
 audio.play();
+
+// List the available voices
+const { voices, total } = await tts.listVoices();
+console.log(`${total} voices available`);
+for (const voice of voices) {
+  console.log(voice.voiceId, voice.name, voice.kind); // kind: 'system' | 'custom'
+}
 ```
 
 ### NPC Conversations

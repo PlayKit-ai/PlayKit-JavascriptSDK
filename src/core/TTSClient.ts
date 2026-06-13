@@ -7,6 +7,7 @@ import {
   TTSResult,
   TTSTimestampsConfig,
   TTSTimestampsResult,
+  VoiceListResult,
   PlayKitError,
 } from '../types';
 import { TTSProvider } from '../providers/TTSProvider';
@@ -79,6 +80,14 @@ export class TTSClient {
       ...config,
       model: config.model || this.model,
     });
+  }
+
+  /**
+   * List the voices available for speech synthesis
+   * @returns The available voices and a total count
+   */
+  async listVoices(): Promise<VoiceListResult> {
+    return this.provider.listVoices();
   }
 
   /**

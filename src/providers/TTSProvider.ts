@@ -8,6 +8,8 @@ import {
   TTSTimestampsConfig,
   TTSTimestampsResult,
   Alignment,
+  VoiceInfo,
+  VoiceListResult,
   PlayKitError,
   SDKConfig,
 } from '../types';
@@ -117,6 +119,36 @@ export class TTSProvider {
     return response;
   }
 
+  /** GET a TTS endpoint; throws a PlayKitError on a non-ok response. */
+  private async get(endpoint: string): Promise<Response> {
+    await this.authManager.ensureValidToken();
+    const token = this.authManager.getToken();
+    if (!token) {
+      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
+    }
+
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...getSDKHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: 'Request failed' }));
+      throw new PlayKitError(
+        error.message || 'Request failed',
+        error.code,
+        response.status
+      );
+    }
+
+    return response;
+  }
+
   private checkBalanceAfter(): void {
     if (this.playerClient) {
       this.playerClient.checkBalanceAfterApiCall().catch(() => {
@@ -218,6 +250,48 @@ export class TTSProvider {
 
       this.checkBalanceAfter();
       return result;
+    } catch (error) {
+      if (error instanceof PlayKitError) throw error;
+      throw new PlayKitError(
+        error instanceof Error ? error.message : 'Unknown error',
+        'TTS_ERROR'
+      );
+    }
+  }
+
+  /**
+   * List the voices available for speech synthesis.
+   */
+  async listVoices(): Promise<VoiceListResult> {
+    const endpoint = `/ai/${this.config.gameId}/v2/audio/voices`;
+    try {
+      const response = await this.get(endpoint);
+      const json = (await response.json()) as {
+        voices?: Array<{
+          voice_id: string;
+          name?: string;
+          description?: string;
+          language?: string;
+          kind?: string;
+        }>;
+        total?: number;
+      };
+
+      const voices: VoiceInfo[] = (json.voices ?? []).map((v) => {
+        const voice: VoiceInfo = {
+          voiceId: v.voice_id,
+          kind: v.kind === 'custom' ? 'custom' : 'system',
+        };
+        if (v.name !== undefined) voice.name = v.name;
+        if (v.description !== undefined) voice.description = v.description;
+        if (v.language !== undefined) voice.language = v.language;
+        return voice;
+      });
+
+      return {
+        voices,
+        total: Number(json.total) || voices.length,
+      };
     } catch (error) {
       if (error instanceof PlayKitError) throw error;
       throw new PlayKitError(

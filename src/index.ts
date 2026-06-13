@@ -103,6 +103,8 @@ export type {
   AlignmentItem,
   VoiceMixEntry,
   VoiceSettings,
+  VoiceInfo,
+  VoiceListResult,
 } from './types';
 
 // Recharge types

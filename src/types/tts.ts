@@ -122,3 +122,25 @@ export interface TTSTimestampsResult extends TTSResult {
   /** Word/sentence timings, or null if unavailable. */
   alignment: Alignment | null;
 }
+
+/** One voice available for speech synthesis. */
+export interface VoiceInfo {
+  /** Voice id to pass as `voice` in a TTS request. */
+  voiceId: string;
+  /** Human-readable display name (if reported). */
+  name?: string;
+  /** Description of the voice (if reported). */
+  description?: string;
+  /** Primary language of the voice (if reported). */
+  language?: string;
+  /** Whether this is a built-in system voice or a custom voice. */
+  kind: 'system' | 'custom';
+}
+
+/** Result of `listVoices`: the available voices and a total count. */
+export interface VoiceListResult {
+  /** Voices available for synthesis. */
+  voices: VoiceInfo[];
+  /** Total number of voices. */
+  total: number;
+}
