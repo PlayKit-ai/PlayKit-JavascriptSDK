@@ -81,6 +81,7 @@ export type {
   StructuredOutputConfig,
   ChatCompletionResponse,
   StreamChunk,
+  Effort,
   // Image types
   ImageSize,
   ImageInput,

@@ -332,7 +332,10 @@ export class PlayKitSDK extends EventEmitter {
    */
   createChatClient(model?: string): ChatClient {
     this.ensureInitialized();
-    const client = new ChatClient(this.chatProvider, model || this.config.defaultChatModel);
+    const client = new ChatClient(
+      this.chatProvider,
+      model || this.config.defaultChatModel
+    );
     // Automatically use the SDK's schema library
     client.setSchemaLibrary(this.schemaLibrary);
     return client;

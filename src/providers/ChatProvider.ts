@@ -50,6 +50,41 @@ export class ChatProvider {
   }
 
   /**
+   * Resolve the `thinking` payload to send on the wire.
+   *
+   * Resolution order for effort: per-request `thinking.effort` > SDK-level
+   * `defaultThinkingEffort` > omit (the server then defaults to off). This
+   * mirrors how the chat model resolves (`chatConfig.model || defaultChatModel`).
+   *
+   * The deprecated `enabled` flag is preserved as an alias: when no effort can be
+   * resolved, `enabled: false` maps to `{ effort: 'off' }` and `enabled: true`
+   * maps to `{ effort: 'minimal' }`.
+   *
+   * @returns The `{ effort }` (and/or `enabled`) object to assign to
+   * `requestBody.thinking`, or `undefined` to send nothing.
+   */
+  private resolveThinking(chatConfig: ChatConfig): Record<string, any> | undefined {
+    const thinking = chatConfig.thinking;
+
+    // Precedence: per-request `effort` > per-request `enabled` alias > SDK-level
+    // `defaultThinkingEffort` > omit (server then defaults to off). The `enabled`
+    // alias MUST be checked BEFORE the SDK default, so an explicit per-request
+    // `enabled: false` is never overridden by a configured default effort.
+    if (thinking?.effort) {
+      return { effort: thinking.effort };
+    }
+    if (thinking?.enabled !== undefined) {
+      return { effort: thinking.enabled ? 'minimal' : 'off' };
+    }
+    if (this.config.defaultThinkingEffort) {
+      return { effort: this.config.defaultThinkingEffort };
+    }
+
+    // Nothing to send — server defaults to off.
+    return undefined;
+  }
+
+  /**
    * Make a chat completion request (non-streaming)
    */
   async chatCompletion(chatConfig: ChatConfig): Promise<ChatCompletionResponse> {
@@ -77,8 +112,9 @@ export class ChatProvider {
       top_p: chatConfig.topP || null,
     };
 
-    if (chatConfig.thinking) {
-      requestBody.thinking = chatConfig.thinking;
+    const thinking = this.resolveThinking(chatConfig);
+    if (thinking) {
+      requestBody.thinking = thinking;
     }
 
     try {
@@ -161,8 +197,9 @@ export class ChatProvider {
       top_p: chatConfig.topP || null,
     };
 
-    if (chatConfig.thinking) {
-      requestBody.thinking = chatConfig.thinking;
+    const thinking = this.resolveThinking(chatConfig);
+    if (thinking) {
+      requestBody.thinking = thinking;
     }
 
     try {
@@ -249,8 +286,9 @@ export class ChatProvider {
     if (chatConfig.tool_choice) {
       requestBody.tool_choice = chatConfig.tool_choice;
     }
-    if (chatConfig.thinking) {
-      requestBody.thinking = chatConfig.thinking;
+    const thinking = this.resolveThinking(chatConfig);
+    if (thinking) {
+      requestBody.thinking = thinking;
     }
 
     try {
@@ -333,8 +371,9 @@ export class ChatProvider {
     if (chatConfig.tool_choice) {
       requestBody.tool_choice = chatConfig.tool_choice;
     }
-    if (chatConfig.thinking) {
-      requestBody.thinking = chatConfig.thinking;
+    const thinking = this.resolveThinking(chatConfig);
+    if (thinking) {
+      requestBody.thinking = thinking;
     }
 
     try {

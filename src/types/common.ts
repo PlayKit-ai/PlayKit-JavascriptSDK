@@ -3,6 +3,7 @@
  */
 
 import type { LogConfig } from '../utils/Logger';
+import type { Effort } from './chat';
 
 /**
  * Message role in a conversation
@@ -218,6 +219,15 @@ export interface SDKConfig {
 
   /** Default chat model to use */
   defaultChatModel?: string;
+
+  /**
+   * Default reasoning ("thinking") effort to use for chat requests.
+   *
+   * Resolution order per request: per-request `thinking.effort` > this SDK-level
+   * default > omit (the server then defaults to off). Sent on the wire as
+   * `thinking: { effort }`. Use `'off'` to explicitly disable reasoning.
+   */
+  defaultThinkingEffort?: Effort;
 
   /** Default image model to use */
   defaultImageModel?: string;

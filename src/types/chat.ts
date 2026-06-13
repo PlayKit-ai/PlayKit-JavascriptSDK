@@ -5,6 +5,16 @@
 import { Message, ToolCall } from './common';
 
 /**
+ * Reasoning ("thinking") effort level for thinking-capable models.
+ *
+ * Wire values are lowercase strings sent as `thinking: { effort }`.
+ * - `'off'` explicitly disables reasoning (the server also defaults to off when
+ *   no effort is provided).
+ * - `'minimal'` .. `'max'` request progressively more reasoning effort.
+ */
+export type Effort = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'max';
+
+/**
  * Tool definition for function calling
  */
 export interface ChatTool {
@@ -49,10 +59,19 @@ export interface ChatConfig {
 
   /** Reasoning effort for thinking-capable models */
   thinking?: {
-    /** Whether thinking is enabled */
+    /**
+     * Whether thinking is enabled.
+     *
+     * @deprecated Use `effort` instead. `enabled: false` is an alias for
+     * `effort: 'off'`; `enabled: true` (without `effort`) maps to
+     * `effort: 'minimal'`. Per-request `effort` takes precedence.
+     */
     enabled?: boolean;
-    /** Reasoning effort level */
-    effort?: 'minimal' | 'low' | 'medium' | 'high' | 'max';
+    /**
+     * Reasoning effort level. When set, this is sent to the server as
+     * `thinking: { effort }`. Overrides the SDK-level `defaultThinkingEffort`.
+     */
+    effort?: Effort;
   };
 }
 
