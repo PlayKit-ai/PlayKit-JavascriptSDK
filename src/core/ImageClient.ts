@@ -76,7 +76,7 @@ export class ImageClient {
 
     return new GeneratedImageImpl(
       imageData.b64_json,
-      config.prompt,
+      config.prompt ?? '',
       imageData.revised_prompt ?? config.prompt,
       config.size,
       imageData.b64_json_original,
@@ -105,7 +105,7 @@ export class ImageClient {
 
       return new GeneratedImageImpl(
         imageData.b64_json,
-        config.prompt,
+        config.prompt ?? '',
         imageData.revised_prompt ?? config.prompt,
         config.size,
         imageData.b64_json_original,

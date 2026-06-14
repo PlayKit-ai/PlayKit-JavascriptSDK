@@ -147,8 +147,6 @@ export interface DeviceAuthInitResult {
 export class DeviceAuthFlowManager extends EventEmitter {
   /** Shared promise for the current flow - allows multiple callers to await the same result */
   private static currentFlowPromise: Promise<DeviceAuthResult> | null = null;
-  /** Reference to the currently active instance */
-  private static activeInstance: DeviceAuthFlowManager | null = null;
 
   private baseURL: string;
   private gameId: string;
@@ -476,14 +474,12 @@ export class DeviceAuthFlowManager extends EventEmitter {
     // Store the flow promise so subsequent calls can await the same result
     const flowPromise = this.executeFlow(options);
     DeviceAuthFlowManager.currentFlowPromise = flowPromise;
-    DeviceAuthFlowManager.activeInstance = this;
 
     try {
       return await flowPromise;
     } finally {
       // Clean up static state when flow completes (success or failure)
       DeviceAuthFlowManager.currentFlowPromise = null;
-      DeviceAuthFlowManager.activeInstance = null;
     }
   }
 
