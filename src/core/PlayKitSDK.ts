@@ -147,8 +147,7 @@ export class PlayKitSDK extends EventEmitter {
             // Auto-restart login flow in browser environment
             if (typeof window !== 'undefined') {
               this.logger.debug('Restarting authentication flow...');
-              const authMethod = this.config.authMethod || 'device';
-              await this.authManager.startAuthFlow(authMethod);
+              await this.authManager.startAuthFlow();
 
               // Retry getting player info after re-authentication
               await this.playerClient.getPlayerInfo();
@@ -200,13 +199,12 @@ export class PlayKitSDK extends EventEmitter {
     }
 
     // Emit fallback started event
-    const fallbackMethod = this.config.authMethod || 'device';
-    this.emit('developer_token_fallback_started', { fallbackMethod });
-    this.logger.debug('Starting fallback to player login', { fallbackMethod });
+    this.emit('developer_token_fallback_started', { fallbackMethod: 'device' });
+    this.logger.debug('Starting fallback to player login');
 
     try {
       // Start player login flow
-      await this.authManager.startAuthFlow(fallbackMethod);
+      await this.authManager.startAuthFlow();
 
       // Verify the new token
       await this.playerClient.getPlayerInfo();
@@ -275,26 +273,6 @@ export class PlayKitSDK extends EventEmitter {
    */
   isAuthenticated(): boolean {
     return this.authManager.isAuthenticated();
-  }
-
-  /**
-   * Exchange JWT for player token
-   */
-  async login(jwt: string): Promise<string> {
-    const token = await this.authManager.exchangeJWT(jwt);
-
-    // Verify token validity and fetch user info
-    try {
-      await this.playerClient.getPlayerInfo();
-      this.logger.debug('Login successful, token validated and user info fetched');
-    } catch (error) {
-      // If token is invalid, logout and re-throw error
-      this.logger.error('Token validation failed after login:', error);
-      await this.authManager.logout();
-      throw new Error('Token validation failed: ' + (error instanceof Error ? error.message : String(error)));
-    }
-
-    return token;
   }
 
   /**

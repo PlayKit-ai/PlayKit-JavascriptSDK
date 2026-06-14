@@ -136,15 +136,6 @@ export interface APIResult<T> {
 }
 
 /**
- * Authentication method type
- * - 'device': Device Authorization flow with PKCE (recommended, opens browser for auth)
- * - 'headless': Embedded verification code login (creates global tokens)
- *
- * @deprecated 'headless' is deprecated and will be removed in v2.0. Use 'device' instead.
- */
-export type AuthMethod = 'device' | 'headless';
-
-/**
  * Configuration for developerToken fallback behavior
  * When developerToken authentication fails, the SDK can automatically
  * fall back to player login flow.
@@ -173,9 +164,6 @@ export interface SDKConfig {
 
   /** Developer token for testing (optional, for development only) */
   developerToken?: string;
-
-  /** Player JWT token for production (optional) */
-  playerJWT?: string;
 
   /**
    * Player token to use directly (optional)
@@ -208,14 +196,6 @@ export interface SDKConfig {
    * Default: 'browser'
    */
   mode?: SDKMode;
-
-  /**
-   * Authentication method to use
-   * - 'device': Device Authorization flow with PKCE (recommended, opens browser for auth)
-   * - 'headless': Embedded verification code login (creates global tokens)
-   * Default: 'device'
-   */
-  authMethod?: AuthMethod;
 
   /** Default chat model to use */
   defaultChatModel?: string;

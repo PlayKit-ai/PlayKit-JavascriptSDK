@@ -6,14 +6,12 @@
 import EventEmitter from 'eventemitter3';
 import { AuthState, PlayKitError, SDKConfig, TokenRefreshResult } from '../types';
 import { TokenStorage } from './TokenStorage';
-import { AuthFlowManager } from './AuthFlowManager';
 import { DeviceAuthFlowManager, DeviceAuthFlowOptions, DeviceAuthResult, DeviceAuthInitResult, TokenScope } from './DeviceAuthFlowManager';
 import { Logger } from '../utils/Logger';
 import { getSDKHeaders } from '../utils/sdkHeaders';
 
 // @ts-ignore - replaced at build time
 const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
-const JWT_EXCHANGE_ENDPOINT = '/api/external/exchange-jwt';
 const TOKEN_REFRESH_ENDPOINT = '/api/auth/refresh';
 
 export class AuthManager extends EventEmitter {
@@ -21,7 +19,6 @@ export class AuthManager extends EventEmitter {
   private authState: AuthState;
   private config: SDKConfig;
   private baseURL: string;
-  private authFlowManager: AuthFlowManager | null = null;
   private deviceAuthFlowManager: DeviceAuthFlowManager | null = null;
   private logger = Logger.getLogger('AuthManager');
   /** Shared promise for current device auth flow - allows multiple callers to await the same result */
@@ -99,12 +96,6 @@ export class AuthManager extends EventEmitter {
       }
     }
 
-    // Check if player JWT was provided
-    if (this.config.playerJWT) {
-      await this.exchangeJWT(this.config.playerJWT);
-      return;
-    }
-
     // Check for platform-injected token (same-domain scenario)
     // This allows seamless auth when SDK runs in a context where the platform
     // (e.g., Agentland-Space) has already stored a token in localStorage
@@ -128,34 +119,29 @@ export class AuthManager extends EventEmitter {
     // In server mode, don't try to show UI - just throw error
     if (this.config.mode === 'server') {
       throw new PlayKitError(
-        'No authentication token provided. In server mode, please provide developerToken, playerToken, or playerJWT.',
+        'No authentication token provided. In server mode, please provide developerToken or playerToken.',
         'NOT_AUTHENTICATED'
       );
     }
 
     // Auto-start login flow in browser environment
     if (typeof window !== 'undefined') {
-      // Default to device auth if not specified
-      const authMethod = this.config.authMethod || 'device';
-      await this.startAuthFlow(authMethod);
+      await this.startAuthFlow();
       // If we reach here, authentication was successful
       // If it failed, startAuthFlow() will have thrown an error
     } else {
       // Node.js environment - cannot show UI, must provide token manually
       throw new PlayKitError(
-        'No authentication token provided. Please provide developerToken, playerToken, playerJWT, or call login() manually.',
+        'No authentication token provided. Please provide developerToken or playerToken.',
         'NOT_AUTHENTICATED'
       );
     }
   }
 
   /**
-   * Start the authentication flow UI
-   *
-   * @param authMethod - Authentication method to use ('device' or 'headless')
-   * @deprecated 'headless' authentication is deprecated and will be removed in v2.0. Use 'device' instead.
+   * Start the authentication flow (Device Authorization + PKCE).
    */
-  async startAuthFlow(authMethod: 'device' | 'headless' = 'device'): Promise<void> {
+  async startAuthFlow(): Promise<void> {
     // If a flow is already in progress, return the shared promise so all callers await the same result
     if (this.currentAuthFlowPromise) {
       this.logger.debug('Auth flow already in progress, waiting for existing flow');
@@ -163,7 +149,7 @@ export class AuthManager extends EventEmitter {
     }
 
     // Store the flow promise so subsequent calls can await the same result
-    const flowPromise = this.executeAuthFlow(authMethod);
+    const flowPromise = this.executeAuthFlow();
     this.currentAuthFlowPromise = flowPromise;
 
     try {
@@ -174,120 +160,42 @@ export class AuthManager extends EventEmitter {
   }
 
   /**
-   * Internal method that executes the actual auth flow
+   * Internal method that executes the Device Authorization flow.
    * @private
    */
-  private async executeAuthFlow(authMethod: 'device' | 'headless' = 'device'): Promise<void> {
-    // Deprecation warning for headless auth
-    if (authMethod === 'headless') {
-      this.logger.warn(
-        '"headless" authentication is deprecated and will be removed in v2.0. ' +
-        'Please migrate to "device" authentication.'
-      );
-    }
-
+  private async executeAuthFlow(): Promise<void> {
     try {
-      if (authMethod === 'device') {
-        // Use Device Authorization flow (recommended)
-        this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
+      // Device Authorization flow with PKCE — the only login flow.
+      this.deviceAuthFlowManager = new DeviceAuthFlowManager(this.baseURL, this.config.gameId);
 
-        const result = await this.deviceAuthFlowManager.startFlow({
-          scope: 'player:play',
-        });
-
-        // Update auth state with the player token and refresh token
-        this.authState = {
-          isAuthenticated: true,
-          token: result.access_token,
-          tokenType: 'player',
-          expiresAt: Date.now() + result.expires_in * 1000,
-          refreshToken: result.refresh_token,
-          refreshExpiresAt: Date.now() + result.refresh_expires_in * 1000,
-        };
-
-        // Save to storage
-        await this.storage.saveAuthState(this.config.gameId, this.authState);
-
-        this.emit('authenticated', this.authState);
-
-        // Clean up
-        this.deviceAuthFlowManager.destroy();
-        this.deviceAuthFlowManager = null;
-      } else {
-        // Use headless verification code flow
-        this.authFlowManager = new AuthFlowManager(this.baseURL);
-
-        // Get global token from auth flow
-        const globalToken = await this.authFlowManager.startFlow();
-
-        // Exchange for player token
-        await this.exchangeJWT(globalToken);
-
-        // Clean up
-        this.authFlowManager.destroy();
-        this.authFlowManager = null;
-      }
-    } catch (error) {
-      // User canceled or error occurred
-      this.authFlowManager?.destroy();
-      this.authFlowManager = null;
-      this.deviceAuthFlowManager?.destroy();
-      this.deviceAuthFlowManager = null;
-
-      // Re-emit error
-      this.emit('error', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Exchange JWT for player token
-   */
-  async exchangeJWT(jwt: string): Promise<string> {
-    try {
-      const response = await fetch(`${this.baseURL}${JWT_EXCHANGE_ENDPOINT}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify({ gameId: this.config.gameId }),
+      const result = await this.deviceAuthFlowManager.startFlow({
+        scope: 'player:play',
       });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'JWT exchange failed' }));
-        throw new PlayKitError(
-          error.message || 'JWT exchange failed',
-          error.code,
-          response.status
-        );
-      }
-
-      const data = await response.json();
-      const playerToken = data.playerToken || data.token;
-
-      if (!playerToken) {
-        throw new PlayKitError('No player token received from server');
-      }
-
-      // Calculate expiration (assume 24 hours if not provided)
-      const expiresIn = data.expiresIn || 86400;
-      const expiresAt = Date.now() + expiresIn * 1000;
-
+      // Update auth state with the player token and refresh token
       this.authState = {
         isAuthenticated: true,
-        token: playerToken,
+        token: result.access_token,
         tokenType: 'player',
-        expiresAt,
+        expiresAt: Date.now() + result.expires_in * 1000,
+        refreshToken: result.refresh_token,
+        refreshExpiresAt: Date.now() + result.refresh_expires_in * 1000,
       };
 
       // Save to storage
       await this.storage.saveAuthState(this.config.gameId, this.authState);
 
       this.emit('authenticated', this.authState);
-      return playerToken;
+
+      // Clean up
+      this.deviceAuthFlowManager.destroy();
+      this.deviceAuthFlowManager = null;
     } catch (error) {
+      // User canceled or error occurred
+      this.deviceAuthFlowManager?.destroy();
+      this.deviceAuthFlowManager = null;
+
+      // Re-emit error
       this.emit('error', error);
       throw error;
     }
@@ -561,7 +469,7 @@ export class AuthManager extends EventEmitter {
    * Check if an authentication flow is currently in progress
    */
   isAuthFlowInProgress(): boolean {
-    return !!(this.authFlowManager || this.deviceAuthFlowManager);
+    return !!this.deviceAuthFlowManager;
   }
 
   /**

@@ -32,10 +32,6 @@ export type { AIContextManagerConfig, AIContextManagerEvents } from './core/AICo
 // Authentication
 export { AuthManager } from './auth/AuthManager';
 export { TokenStorage } from './auth/TokenStorage';
-/**
- * @deprecated Use DeviceAuthFlowManager instead. Will be removed in v2.0
- */
-export { AuthFlowManager } from './auth/AuthFlowManager';
 export { DeviceAuthFlowManager } from './auth/DeviceAuthFlowManager';
 export type {
   DeviceAuthFlowOptions,
