@@ -8,6 +8,11 @@ const VALID_PART_TYPES: ReadonlySet<string> = new Set([
   'file',
   'audio',
   'input_audio',
+  'reasoning',
+  'tool-call',
+  'tool-result',
+  'tool-approval-request',
+  'tool-approval-response',
 ]);
 
 function describePart(part: any): string {
@@ -66,7 +71,7 @@ export function assertValidMessages(messages: Message[] | undefined | null): voi
         if ('role' in part && 'content' in part) {
           throw new PlayKitError(
             `messages[${i}].content[${j}] is shaped like a Message (has role/content) ` +
-              `but content parts must be {type:'text'|'image'|'image_url'|'file'|'audio'|'input_audio',...}. ` +
+              `but content parts must include a recognized 'type' field. ` +
               `Did you mean to pass that array as messages directly? ` +
               `e.g. \`messages: theArray\` instead of \`messages: [{role:'user', content: theArray}]\`. ` +
               `Got part ${describePart(part)}`,
@@ -75,7 +80,7 @@ export function assertValidMessages(messages: Message[] | undefined | null): voi
         }
         throw new PlayKitError(
           `messages[${i}].content[${j}] is missing a recognized 'type' field ` +
-            `(expected one of text|image|image_url|file|audio|input_audio). Got part ${describePart(part)}`,
+            `(expected one of ${Array.from(VALID_PART_TYPES).join('|')}). Got part ${describePart(part)}`,
           'INVALID_MESSAGES'
         );
       }

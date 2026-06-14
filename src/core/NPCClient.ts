@@ -10,7 +10,16 @@
  */
 
 import EventEmitter from 'eventemitter3';
-import { Message, NpcAction, NpcActionResponse, npcActionToTool } from '../types';
+import {
+  Message,
+  MessageContentPart,
+  NpcAction,
+  NpcActionResponse,
+  ToolCall,
+  createToolCallContentPart,
+  createToolResultContentPart,
+  npcActionToTool,
+} from '../types';
 import { ChatClient } from './ChatClient';
 import { AIContextManager } from './AIContextManager';
 import { Logger } from '../utils/Logger';
@@ -568,12 +577,8 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
         response.hasActions = response.actionCalls.length > 0;
       }
 
-      // Add assistant response to history
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: response.text,
-        tool_calls: result.tool_calls,
-      };
+      // Add assistant response to history in canonical PlayKit format.
+      const assistantMessage = this.createAssistantHistoryMessage(response.text, result.tool_calls);
       this.history.push(assistantMessage);
 
       this.trimHistory();
@@ -646,12 +651,8 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
             response.hasActions = response.actionCalls.length > 0;
           }
 
-          // Add assistant response to history
-          const assistantMessage: Message = {
-            role: 'assistant',
-            content: response.text,
-            tool_calls: result.tool_calls,
-          };
+          // Add assistant response to history in canonical PlayKit format.
+          const assistantMessage = this.createAssistantHistoryMessage(response.text, result.tool_calls);
           this.history.push(assistantMessage);
 
           this.trimHistory();
@@ -682,11 +683,7 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
    */
   reportActionResults(results: Record<string, string>): void {
     for (const [callId, result] of Object.entries(results)) {
-      this.history.push({
-        role: 'tool',
-        tool_call_id: callId,
-        content: result,
-      });
+      this.history.push(this.createToolResultHistoryMessage(callId, result));
     }
   }
 
@@ -694,11 +691,62 @@ Output ONLY a JSON array of ${predictionNum} strings, nothing else:
    * Report a single action result
    */
   reportActionResult(callId: string, result: string): void {
-    this.history.push({
+    this.history.push(this.createToolResultHistoryMessage(callId, result));
+  }
+
+  private createAssistantHistoryMessage(text: string, toolCalls?: ToolCall[]): Message {
+    if (!toolCalls || toolCalls.length === 0) {
+      return { role: 'assistant', content: text };
+    }
+
+    const content: MessageContentPart[] = [];
+    if (text) {
+      content.push({ type: 'text', text });
+    }
+    content.push(...toolCalls.map(createToolCallContentPart));
+
+    return {
+      role: 'assistant',
+      content,
+    };
+  }
+
+  private createToolResultHistoryMessage(callId: string, result: string): Message {
+    const toolName = this.findToolNameForCall(callId);
+    if (!toolName) {
+      // Saved histories from older SDKs may not include enough context to infer
+      // the tool name. Keep the legacy shape; the server normalizer can still
+      // infer it when the matching assistant call is present.
+      return {
+        role: 'tool',
+        tool_call_id: callId,
+        content: result,
+      };
+    }
+
+    return {
       role: 'tool',
       tool_call_id: callId,
-      content: result,
-    });
+      content: [createToolResultContentPart(callId, toolName, result)],
+    };
+  }
+
+  private findToolNameForCall(callId: string): string | undefined {
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      const message = this.history[i];
+      if (Array.isArray(message.content)) {
+        for (const part of message.content) {
+          if (part.type === 'tool-call' && part.toolCallId === callId) {
+            return part.toolName;
+          }
+        }
+      }
+      const legacyCall = message.tool_calls?.find(tc => tc.id === callId);
+      if (legacyCall) {
+        return legacyCall.function.name;
+      }
+    }
+    return undefined;
   }
 
   /**

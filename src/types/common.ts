@@ -57,9 +57,47 @@ export interface AudioContentPart {
 }
 
 /**
+ * Canonical PlayKit tool-call content part.
+ * Matches the server's internal model-message shape while legacy `tool_calls`
+ * fields remain accepted for backward compatibility.
+ */
+export interface ToolCallContentPart {
+  type: 'tool-call';
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
+  providerExecuted?: boolean;
+}
+
+/**
+ * Canonical PlayKit tool-result output.
+ */
+export type ToolResultOutput =
+  | { type: 'text'; value: string }
+  | { type: 'json'; value: unknown }
+  | { type: 'execution-denied'; reason?: string }
+  | { type: 'error-text'; value: string }
+  | { type: 'error-json'; value: unknown };
+
+/**
+ * Canonical PlayKit tool-result content part.
+ */
+export interface ToolResultContentPart {
+  type: 'tool-result';
+  toolCallId: string;
+  toolName: string;
+  output: ToolResultOutput;
+}
+
+/**
  * Content part types for multimodal messages
  */
-export type MessageContentPart = TextContentPart | ImageContentPart | AudioContentPart;
+export type MessageContentPart =
+  | TextContentPart
+  | ImageContentPart
+  | AudioContentPart
+  | ToolCallContentPart
+  | ToolResultContentPart;
 
 /**
  * Message content - can be a simple string or array of content parts for multimodal
@@ -73,9 +111,15 @@ export interface Message {
   role: MessageRole;
   /** Content can be a string or array of content parts (for multimodal) */
   content: MessageContent;
-  /** Tool calls made by the assistant (when role is 'assistant') */
+  /**
+   * Legacy OpenAI-compatible tool calls made by the assistant.
+   * Prefer canonical `{ type: 'tool-call' }` content parts for new history.
+   */
   tool_calls?: ToolCall[];
-  /** Tool call ID this message responds to (when role is 'tool') */
+  /**
+   * Legacy OpenAI-compatible tool call ID this message responds to.
+   * Prefer canonical `{ type: 'tool-result' }` content parts for new history.
+   */
   tool_call_id?: string;
 }
 
@@ -123,6 +167,54 @@ export function createMultimodalMessage(
   }
 
   return { role, content };
+}
+
+/**
+ * Convert an OpenAI-compatible tool call returned by the API into the canonical
+ * PlayKit message content part used for future requests.
+ */
+export function createToolCallContentPart(toolCall: ToolCall): ToolCallContentPart {
+  let input: unknown = {};
+  const args = toolCall.function?.arguments;
+  if (typeof args === 'string' && args.trim()) {
+    try {
+      input = JSON.parse(args);
+    } catch {
+      input = args;
+    }
+  }
+
+  return {
+    type: 'tool-call',
+    toolCallId: toolCall.id,
+    toolName: toolCall.function.name,
+    input,
+  };
+}
+
+/**
+ * Create a canonical PlayKit tool-result content part.
+ */
+export function createToolResultContentPart(
+  toolCallId: string,
+  toolName: string,
+  result: string | unknown
+): ToolResultContentPart {
+  if (typeof result === 'string') {
+    return {
+      type: 'tool-result',
+      toolCallId,
+      toolName,
+      output: { type: 'text', value: result },
+    };
+  }
+
+  return {
+    type: 'tool-result',
+    toolCallId,
+    toolName,
+    output: { type: 'json', value: result },
+  };
 }
 
 /**
