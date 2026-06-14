@@ -1,6 +1,6 @@
 {
   "name": "playkit-sdk",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "PlayKit SDK for JavaScript",
   "main": "dist/playkit-sdk.cjs.js",
   "module": "dist/playkit-sdk.esm.js",
@@ -41,12 +41,12 @@
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cnqdztp/PlayKit-JavascriptSDK"
+    "url": "git+https://github.com/PlayKit-ai/PlayKit-JavascriptSDK.git"
   },
   "bugs": {
-    "url": "https://github.com/cnqdztp/PlayKit-JavascriptSDK/issues"
+    "url": "https://github.com/PlayKit-ai/PlayKit-JavascriptSDK/issues"
   },
-  "homepage": "https://github.com/cnqdztp/PlayKit-JavascriptSDK#readme",
+  "homepage": "https://github.com/PlayKit-ai/PlayKit-JavascriptSDK#readme",
   "dependencies": {
     "eventemitter3": "^5.0.1"
   },
