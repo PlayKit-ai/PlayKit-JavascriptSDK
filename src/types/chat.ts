@@ -1,280 +1,124 @@
-/**
- * Chat and text generation types
- */
+import type { Message, ToolCall } from './common';
 
-import { Message, ToolCall } from './common';
+/** Select an existing prompt for execution through the gateway. */
+export type PromptSelector = { name: string; version?: number; label?: string };
+export type PromptVariables = Record<string, string | number | boolean>;
+export type PromptPlaceholders = Record<string, Message[]>;
 
-/**
- * Reasoning ("thinking") effort level for thinking-capable models.
- *
- * Wire values are lowercase strings sent as `thinking: { effort }`.
- * - `'off'` explicitly disables reasoning (the server also defaults to off when
- *   no effort is provided).
- * - `'minimal'` .. `'max'` request progressively more reasoning effort.
- */
 export type Effort = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'max';
-
-/**
- * Tool definition for function calling
- */
+export type JsonSchema = Record<string, unknown>;
 export interface ChatTool {
   type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, any>;
-  };
+  function: { name: string; description?: string; parameters: JsonSchema };
 }
-
-/**
- * Configuration for text generation
- */
-export interface ChatConfig {
-  /** Array of messages in the conversation */
-  messages: Message[];
-
-  /** Model to use for generation */
+export type ToolChoice =
+  | 'auto'
+  | 'required'
+  | 'none'
+  | { type: 'function'; function: { name: string } };
+export interface ChatParameters {
   model?: string;
-
-  /** Temperature for generation (0.0 - 2.0) */
   temperature?: number;
-
-  /** Maximum tokens to generate */
   maxTokens?: number;
-
-  /** Random seed for reproducible results */
-  seed?: number;
-
-  /** Stop sequences */
-  stop?: string[];
-
-  /** Top-p sampling */
   topP?: number;
-
-  /** Tools available for the model to use */
-  tools?: ChatTool[];
-
-  /** Tool choice: 'auto', 'required', 'none', or specific tool */
-  tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
-
-  /** Reasoning effort for thinking-capable models */
-  thinking?: {
-    /**
-     * Whether thinking is enabled.
-     *
-     * @deprecated Use `effort` instead. `enabled: false` is an alias for
-     * `effort: 'off'`; `enabled: true` (without `effort`) maps to
-     * `effort: 'minimal'`. Per-request `effort` takes precedence.
-     */
-    enabled?: boolean;
-    /**
-     * Reasoning effort level. When set, this is sent to the server as
-     * `thinking: { effort }`. Overrides the SDK-level `defaultThinkingEffort`.
-     */
-    effort?: Effort;
-  };
+  seed?: number;
+  stop?: string[];
+  presencePenalty?: number;
+  frequencyPenalty?: number;
+  thinking?: { effort: Effort };
+  variant?: string;
+  signal?: AbortSignal;
 }
-
-/**
- * Configuration for streaming text generation
- */
-export interface ChatStreamConfig extends ChatConfig {
-  /** Callback for each chunk of text */
-  onChunk: (chunk: string) => void;
-
-  /** Callback for each chunk of reasoning (thinking) text */
-  onReasoning?: (chunk: string) => void;
-
-  /** Callback when generation is complete */
-  onComplete?: (fullText: string) => void;
-
-  /** Callback for errors during streaming */
-  onError?: (error: Error) => void;
+export type ChatInput =
+  | { messages: Message[]; prompt?: never; variables?: never; placeholders?: never; cache?: never }
+  | {
+      prompt: PromptSelector;
+      messages?: never;
+      variables?: PromptVariables;
+      placeholders?: PromptPlaceholders;
+      cache?: boolean;
+    };
+export type ChatOutput =
+  | {
+      tools?: ChatTool[];
+      tool_choice?: ToolChoice;
+      schema?: never;
+      output?: never;
+      schemaName?: never;
+      schemaDescription?: never;
+      enum?: never;
+    }
+  | {
+      schema: JsonSchema;
+      output?: 'object' | 'array' | 'enum' | 'no-schema';
+      schemaName?: string;
+      schemaDescription?: string;
+      enum?: string[];
+      tools?: never;
+      tool_choice?: never;
+    };
+export type ChatConfig = ChatInput & ChatParameters & ChatOutput;
+export interface PromptRunReceipt {
+  version: number;
+  versionId: string;
+  requestId: string | null;
 }
-
-/**
- * Result of a text generation request
- */
-export interface ChatResult {
-  /** Generated text content */
+export interface ChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+export interface ChatResult<T = unknown> {
   content: string;
-
-  /** Model used for generation */
+  output?: T;
   model: string;
-
-  /** Finish reason */
-  finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'null';
-
-  /** Token usage information */
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-
-  /** Unique ID for this completion */
+  requestedModel?: string;
+  finishReason: string;
+  usage?: ChatUsage;
   id?: string;
-
-  /** Timestamp of creation */
   created?: number;
-
-  /** Tool calls made by the model */
+  requestId?: string;
   tool_calls?: ToolCall[];
-
-  /** Model's reasoning (thinking) content, present only when the model produced thinking */
   reasoning?: string;
+  prompt?: PromptRunReceipt;
 }
-
-/**
- * Configuration for structured output generation
- */
-export interface StructuredOutputConfig {
-  /** Name of the schema to use */
-  schemaName: string;
-
-  /** Prompt for generation */
-  prompt: string;
-
-  /** Model to use */
+export interface ChatStreamMetadata {
   model?: string;
-
-  /** Temperature */
-  temperature?: number;
-
-  /** Additional messages for context */
-  messages?: Message[];
+  requestedModel?: string;
+  requestId?: string;
+  structuredOutput?: boolean;
+  usage?: ChatUsage;
+  prompt?: PromptRunReceipt;
 }
-
-/**
- * OpenAI-compatible chat completion response
- */
+/** UI-message SSE events emitted by the PlayKit v2 gateway. */
+export interface ChatStreamEvent {
+  type: string;
+  delta?: string;
+  messageId?: string;
+  finishReason?: string;
+  messageMetadata?: ChatStreamMetadata;
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  errorText?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+export type ChatStreamConfig = ChatConfig & {
+  onChunk?: (text: string) => void;
+  onReasoning?: (text: string) => void;
+  onEvent?: (event: ChatStreamEvent) => void;
+};
 export interface ChatCompletionResponse {
   id: string;
   object: string;
   created: number;
   model: string;
-  choices: Array<{
+  output?: unknown;
+  choices: {
     index: number;
     message: Message & { reasoning_content?: string };
     finish_reason: string;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-/**
- * Streaming chunk formats
- */
-export interface StreamChunk {
-  type:
-    | 'text-delta'
-    | 'reasoning-delta'
-    | 'reasoning-start'
-    | 'reasoning-end'
-    | 'done'
-    | 'finish'
-    | 'abort'
-    | 'error';
-  id?: string;
-  delta?: string;
-  error?: string;
-  errorText?: string;
-  reason?: string;
-}
-
-// ===== NPC Action Types =====
-
-/**
- * NPC Action parameter types
- */
-export type NpcActionParamType = 'string' | 'number' | 'boolean' | 'stringEnum';
-
-/**
- * NPC Action parameter definition
- */
-export interface NpcActionParameter {
-  name: string;
-  description: string;
-  type: NpcActionParamType;
-  required?: boolean;
-  enumOptions?: string[];
-}
-
-/**
- * NPC Action definition
- */
-export interface NpcAction {
-  actionName: string;
-  description: string;
-  parameters?: NpcActionParameter[];
-  enabled?: boolean;
-}
-
-/**
- * NPC Action call result
- */
-export interface NpcActionCall {
-  id: string;
-  actionName: string;
-  arguments: Record<string, any>;
-}
-
-/**
- * Response from NPC with actions
- */
-export interface NpcActionResponse {
-  text: string;
-  actionCalls: NpcActionCall[];
-  hasActions: boolean;
-}
-
-/**
- * Helper to convert NpcAction to ChatTool
- */
-export function npcActionToTool(action: NpcAction): ChatTool {
-  const properties: Record<string, any> = {};
-  const required: string[] = [];
-
-  for (const param of action.parameters || []) {
-    const propDef: Record<string, any> = { description: param.description };
-
-    switch (param.type) {
-      case 'string':
-        propDef.type = 'string';
-        break;
-      case 'number':
-        propDef.type = 'number';
-        break;
-      case 'boolean':
-        propDef.type = 'boolean';
-        break;
-      case 'stringEnum':
-        propDef.type = 'string';
-        if (param.enumOptions?.length) {
-          propDef.enum = param.enumOptions;
-        }
-        break;
-    }
-
-    properties[param.name] = propDef;
-    if (param.required !== false) {
-      required.push(param.name);
-    }
-  }
-
-  return {
-    type: 'function',
-    function: {
-      name: action.actionName,
-      description: action.description,
-      parameters: {
-        type: 'object',
-        properties,
-        required,
-      },
-    },
-  };
+  }[];
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }

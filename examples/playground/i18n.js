@@ -33,18 +33,6 @@ const translations = {
     // Tabs
     tabTextGen: 'Text Generation',
     tabImageGen: 'Image Generation',
-    tabNPC: 'NPC Conversations',
-    tabNPCActions: 'NPC Actions',
-
-    // NPC Actions Tab
-    npcActionsTitle: 'NPC Actions (Tool Calling)',
-    npcActionsDesc: 'Demonstrate NPC decision-making with actions. The NPC can trigger actions like opening a shop, starting a quest, or changing emotions.',
-    presetActions: 'Preset Actions',
-    npcActionsSystemPrompt: 'NPC Character',
-    definedActions: 'Defined Actions',
-    addCustomAction: 'Add Custom Action',
-    createActionsNPC: 'Create NPC with Actions',
-    actionEvents: 'Action Events',
 
     // Text Generation Tab
     textGenTitle: 'Text Generation',
@@ -98,20 +86,6 @@ const translations = {
     tempBalanced: 'Balanced (1)',
     tempCreative: 'Creative (2)',
 
-    // NPC Tab
-    npcTitle: 'NPC Conversations',
-    activeNPCs: 'Active NPCs',
-    selectNPC: 'Select an NPC...',
-    createNewNPC: 'Create New NPC',
-    npcName: 'NPC Name (e.g., Guard)',
-    npcSystemPromptPlaceholder: 'You are a medieval guard. You are suspicious of strangers...',
-    createNPCButton: 'Create NPC',
-    npcPlaceholder: 'Select or create an NPC to start chatting...',
-    talkToNPC: 'Talk to the NPC...',
-    saveHistory: 'Save History',
-    loadHistory: 'Load History',
-    resetHistory: 'Reset',
-
     // Messages
     you: 'You',
     ai: 'AI',
@@ -128,19 +102,6 @@ const translations = {
     enterImageDesc: 'Please enter an image description',
     imageGenSuccess: 'Image generated successfully!',
     imageGenFailed: 'Image generation failed',
-    enterNPCName: 'Please enter an NPC name',
-    enterNPCPrompt: 'Please enter a system prompt',
-    npcExists: 'An NPC with this name already exists',
-    npcCreated: 'NPC "{name}" created successfully!',
-    selectNPCFirst: 'Please select an NPC first',
-    historySaved: 'History saved for {name}',
-    historyLoaded: 'History loaded for {name}',
-    noHistory: 'No saved history found',
-    confirmReset: 'Are you sure you want to reset the conversation history?',
-    historyReset: 'Conversation history reset',
-    startConversation: 'Start talking to {name}...',
-    historyResetMsg: 'History reset. Start a new conversation with {name}...',
-    historyLoadedMsg: 'History loaded. Continue the conversation...',
     confirmClearChat: 'Are you sure you want to clear all chat messages?',
     chatHistoryCleared: 'Chat history cleared',
 
@@ -182,18 +143,6 @@ const translations = {
     // Tabs
     tabTextGen: '文本生成',
     tabImageGen: '图像生成',
-    tabNPC: 'NPC 对话',
-    tabNPCActions: 'NPC 行动',
-
-    // NPC Actions Tab
-    npcActionsTitle: 'NPC 行动（工具调用）',
-    npcActionsDesc: '演示 NPC 带有行动的决策能力。NPC 可以触发打开商店、开始任务或改变情绪等行动。',
-    presetActions: '预设行动',
-    npcActionsSystemPrompt: 'NPC 角色',
-    definedActions: '已定义行动',
-    addCustomAction: '添加自定义行动',
-    createActionsNPC: '创建带行动的 NPC',
-    actionEvents: '行动事件',
 
     // Text Generation Tab
     textGenTitle: '文本生成',
@@ -247,20 +196,6 @@ const translations = {
     tempBalanced: '平衡 (1)',
     tempCreative: '创意 (2)',
 
-    // NPC Tab
-    npcTitle: 'NPC 对话',
-    activeNPCs: '活跃的 NPC',
-    selectNPC: '选择一个 NPC...',
-    createNewNPC: '创建新 NPC',
-    npcName: 'NPC 名称（例如：守卫）',
-    npcSystemPromptPlaceholder: '你是一个中世纪守卫。你对陌生人充满怀疑...',
-    createNPCButton: '创建 NPC',
-    npcPlaceholder: '选择或创建一个 NPC 开始对话...',
-    talkToNPC: '与 NPC 对话...',
-    saveHistory: '保存历史',
-    loadHistory: '加载历史',
-    resetHistory: '重置',
-
     // Messages
     you: '你',
     ai: 'AI',
@@ -277,19 +212,6 @@ const translations = {
     enterImageDesc: '请输入图像描述',
     imageGenSuccess: '图像生成成功！',
     imageGenFailed: '图像生成失败',
-    enterNPCName: '请输入 NPC 名称',
-    enterNPCPrompt: '请输入系统提示词',
-    npcExists: '已存在同名 NPC',
-    npcCreated: 'NPC "{name}" 创建成功！',
-    selectNPCFirst: '请先选择一个 NPC',
-    historySaved: '{name} 的历史已保存',
-    historyLoaded: '{name} 的历史已加载',
-    noHistory: '未找到保存的历史',
-    confirmReset: '确定要重置对话历史吗？',
-    historyReset: '对话历史已重置',
-    startConversation: '开始与 {name} 对话...',
-    historyResetMsg: '历史已重置。与 {name} 开始新对话...',
-    historyLoadedMsg: '历史已加载。继续对话...',
     confirmClearChat: '确定要清除所有聊天消息吗？',
     chatHistoryCleared: '聊天历史已清除',
 

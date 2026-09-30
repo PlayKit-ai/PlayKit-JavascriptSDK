@@ -8,7 +8,6 @@ JavaScript/TypeScript SDK for integrating AI capabilities into web-based games.
 
 - AI-powered text generation using GPT models
 - Image generation using DALL-E models
-- NPC conversation management with automatic history tracking
 - JWT-based authentication and token management
 - Real-time streaming responses
 - Framework-agnostic design (compatible with P5.js, Phaser, PixiJS, etc.)
@@ -20,10 +19,12 @@ JavaScript/TypeScript SDK for integrating AI capabilities into web-based games.
 ## Installation
 
 ```bash
-npm install playkit-sdk
+npm install ./playkit-sdk-2.0.0-next.1.tgz
 ```
 
 ## Quick Start
+
+The 2.0 prerelease is built locally with `npm run build` and packaged with `npm pack`.
 
 ### Basic Setup
 
@@ -38,61 +39,69 @@ const sdk = new PlayKitSDK({
 await sdk.initialize();
 ```
 
-### Text Generation
+### Chat
 
-```typescript
-const chat = sdk.createChatClient('gpt-4o-mini');
-
-// Simple chat
-const response = await chat.chat('Hello, introduce yourself');
-console.log(response);
-
-// With system prompt
-const response = await chat.chat(
-  'How should I explore this dungeon?',
-  'You are a wise dungeon guide.'
-);
+```ts
+const chat = sdk.createChatClient();
+const result = await chat.generate({
+  model: 'default-chat',
+  messages: [
+    { role: 'system', content: 'You are a dungeon guide.' },
+    { role: 'user', content: 'Where should I go?' },
+  ],
+  temperature: 0.4,
+  maxTokens: 500,
+});
+console.log(result.content, result.usage, result.requestId);
 ```
 
-### Streaming Text
+### Streaming
 
-```typescript
-await chat.chatStream(
-  'Tell a story about a brave knight',
-  (chunk) => {
-    process.stdout.write(chunk);
+`stream` returns the complete result after the stream finishes. Errors reject
+its promise; an `AbortSignal` cancels the request. `onEvent` exposes tool and
+metadata events as well as text and reasoning events.
+
+```ts
+const controller = new AbortController();
+const result = await chat.stream({
+  messages: [{ role: 'user', content: 'Tell me a story.' }],
+  thinking: { effort: 'high' },
+  signal: controller.signal,
+  onChunk: text => process.stdout.write(text),
+  onReasoning: text => console.log(text),
+  onEvent: event => {
+    if (event.type === 'tool-input-available') console.log(event.input);
   },
-  (fullText) => {
-    console.log('\nComplete:', fullText);
-  }
-);
+});
+console.log(result.usage, result.tool_calls);
 ```
 
-### Reasoning (Thinking)
+### Structured output and tools
 
-Reasoning-capable models can think before answering. Enable it with the
-`thinking` option (set the `effort` level) and read the model's reasoning
-separately from its answer.
+Pass JSON Schema directly; the full message history reaches the model. The
+server validates generated output. The generic type describes the parsed result.
+Tools and structured output are mutually exclusive for a single call.
 
-```typescript
-// Non-streaming: reasoning is returned on `result.reasoning`
-const result = await chat.textGeneration({
-  messages: [{ role: 'user', content: 'Solve: 17 * 24, show your work.' }],
-  thinking: { effort: 'high' },
+```ts
+const result = await chat.generate<{ direction: string }>({
+  messages: [{ role: 'user', content: 'Choose the next direction.' }],
+  schema: {
+    type: 'object',
+    properties: { direction: { type: 'string' } },
+    required: ['direction'],
+    additionalProperties: false,
+  },
 });
+console.log(result.output?.direction);
 
-console.log('Answer:', result.content);
-console.log('Reasoning:', result.reasoning);
-
-// Streaming: reasoning arrives via the `onReasoning` callback,
-// kept separate from the answer text in `onChunk`
-await chat.textGenerationStream({
-  messages: [{ role: 'user', content: 'Solve: 17 * 24, show your work.' }],
-  thinking: { effort: 'high' },
-  onReasoning: (chunk) => process.stdout.write(`[thinking] ${chunk}`),
-  onChunk: (chunk) => process.stdout.write(chunk),
-  onComplete: (fullText) => console.log('\nComplete:', fullText),
+const withTools = await chat.generate({
+  messages: [{ role: 'user', content: 'Look at my inventory.' }],
+  tools: [{ type: 'function', function: {
+    name: 'get_inventory', description: 'Read the player inventory',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  } }],
 });
+console.log(withTools.tool_calls);
 ```
 
 ### Image Generation
@@ -137,28 +146,6 @@ for (const voice of voices) {
 }
 ```
 
-### NPC Conversations
-
-```typescript
-const npc = sdk.createNPCClient({
-  systemPrompt: 'You are a mysterious wizard who speaks in riddles.',
-  temperature: 0.8,
-  maxHistoryLength: 20,
-});
-
-const reply1 = await npc.talk('Who are you?');
-console.log('Wizard:', reply1);
-
-const reply2 = await npc.talk('What is your quest?');
-console.log('Wizard:', reply2);
-
-// Save/load history
-const savedHistory = npc.saveHistory();
-localStorage.setItem('npc_history', savedHistory);
-
-// Later...
-npc.loadHistory(localStorage.getItem('npc_history'));
-```
 
 ### Player Balance Management
 
@@ -190,7 +177,7 @@ sdk.on('insufficient_credits', (error) => {
 ## Usage with P5.js
 
 ```javascript
-let sdk, npc, generatedImage;
+let sdk, chat, generatedImage;
 
 async function setup() {
   createCanvas(800, 600);
@@ -201,14 +188,14 @@ async function setup() {
   });
   await sdk.initialize();
 
-  npc = sdk.createNPCClient({
-    systemPrompt: 'You are a friendly game character.'
-  });
+  chat = sdk.createChatClient();
 }
 
 async function mousePressed() {
-  const reply = await npc.talk('Hello!');
-  console.log(reply);
+  const reply = await chat.generate({
+    messages: [{ role: 'user', content: 'Hello!' }]
+  });
+  console.log(reply.content);
 
   const imageClient = sdk.createImageClient();
   const img = await imageClient.generate('A magical forest');
@@ -222,7 +209,6 @@ function draw() {
   if (generatedImage) {
     image(generatedImage, 0, 0, 400, 400);
   }
-  text('Click to talk to NPC or generate image', 10, height - 20);
 }
 ```
 
@@ -232,7 +218,7 @@ function draw() {
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://unpkg.com/playkit-sdk@latest/dist/playkit-sdk.umd.js"></script>
+  <script src="./dist/playkit-sdk.umd.js"></script>
 </head>
 <body>
   <div id="output"></div>
@@ -262,10 +248,10 @@ function draw() {
       output.innerHTML += `<p><strong>AI:</strong> <span id="aiReply"></span></p>`;
 
       const replyElement = document.getElementById('aiReply');
-      await chat.chatStream(
-        input,
-        (chunk) => { replyElement.innerHTML += chunk; }
-      );
+      await chat.stream({
+        messages: [{ role: 'user', content: input }],
+        onChunk: (chunk) => { replyElement.textContent += chunk; },
+      });
 
       document.getElementById('userInput').value = '';
     }
@@ -299,7 +285,41 @@ This SDK is proprietary software owned by Agentland Lab. Use of this SDK is subj
 - Initial public beta release
 - AI chat support (text generation)
 - Image generation support
-- NPC conversation management
 - Authentication and player management
 - Streaming response support
 - Player balance management and recharge functionality
+
+## Managed prompts
+
+Create prompt definitions, immutable versions, release labels, datasets and
+experiments in the PlayKit web console or through the REST management API.
+The JavaScript SDK executes existing prompts through Chat.
+
+```ts
+const chat = sdk.createChatClient();
+const result = await chat.generate({
+  prompt: { name: 'dialogue/greeting' },
+  variables: { speakerName: 'Mira' },
+  placeholders: { history: [{ role: 'user', content: 'Hello' }] },
+});
+console.log(result.content, result.prompt?.version, result.requestId);
+
+await chat.stream({
+  prompt: { name: 'dialogue/greeting' },
+  variables: { speakerName: 'Mira' },
+  placeholders: { history: [{ role: 'user', content: 'Hello' }] },
+  onChunk: text => process.stdout.write(text),
+});
+```
+
+Messages and managed prompts are mutually exclusive. The gateway resolves the
+prompt, substitutes variables and message placeholders, and uses the version's
+saved configuration. Client-wide defaults do not override that configuration.
+The response identifies the actual version used.
+
+Calls without a selector version or label use the channel's release. Authorized
+developer tokens may explicitly select a version or label and supply per-call
+model parameters. Player tokens use the channel release and its saved parameters.
+
+Prompt retrieval for external model calls, template compilation, creation,
+publication and experimentation belong to the web/API management workflow.

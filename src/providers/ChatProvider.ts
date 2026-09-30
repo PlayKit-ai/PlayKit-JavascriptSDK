@@ -1,534 +1,109 @@
-/**
- * Chat provider for HTTP communication with chat API
- */
-
-import { ChatConfig, ChatCompletionResponse, PlayKitError, SDKConfig, ChatTool, MessageContent } from '../types';
+import type { ChatConfig, SDKConfig } from '../types';
+import { PlayKitError } from '../types';
 import { AuthManager } from '../auth/AuthManager';
 import { PlayerClient } from '../core/PlayerClient';
 import { getSDKHeaders } from '../utils/sdkHeaders';
 import { assertValidMessages } from '../utils/validateMessages';
 
-/**
- * Helper to extract string from MessageContent
- */
-function contentToString(content: MessageContent | null | undefined): string {
-  if (!content) return '';
-  if (typeof content === 'string') return content;
-  // For array of content parts, extract text parts
-  const textParts = content.filter(part => part.type === 'text');
-  return textParts.map(part => (part as { type: 'text'; text: string }).text).join('');
-}
-
-/**
- * Chat config with tools support
- */
-export interface ChatConfigWithTools extends ChatConfig {
-  tools?: ChatTool[];
-  tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
-}
-
-// @ts-ignore - replaced at build time
-const DEFAULT_BASE_URL = __PLAYKIT_BASE_URL__;
+declare const __PLAYKIT_BASE_URL__: string;
+const PARAMETERS = [
+  'model',
+  'temperature',
+  'maxTokens',
+  'topP',
+  'seed',
+  'stop',
+  'presencePenalty',
+  'frequencyPenalty',
+  'thinking',
+  'variant',
+  'tools',
+  'tool_choice',
+  'schema',
+  'output',
+  'schemaName',
+  'schemaDescription',
+  'enum',
+] as const;
 
 export class ChatProvider {
-  private authManager: AuthManager;
-  private config: SDKConfig;
-  private baseURL: string;
+  private readonly baseURL: string;
   private playerClient?: PlayerClient;
-
-  constructor(authManager: AuthManager, config: SDKConfig) {
-    this.authManager = authManager;
-    this.config = config;
-    this.baseURL = config.baseURL || DEFAULT_BASE_URL;
+  constructor(
+    private readonly auth: AuthManager,
+    private readonly config: SDKConfig
+  ) {
+    this.baseURL = (config.baseURL || __PLAYKIT_BASE_URL__).replace(/\/$/, '');
   }
-
-  /**
-   * Set player client for balance checking
-   */
-  setPlayerClient(playerClient: PlayerClient): void {
-    this.playerClient = playerClient;
+  setPlayerClient(client: PlayerClient): void {
+    this.playerClient = client;
   }
-
-  /**
-   * Resolve the `thinking` payload to send on the wire.
-   *
-   * Resolution order for effort: per-request `thinking.effort` > SDK-level
-   * `defaultThinkingEffort` > omit (the server then defaults to off). This
-   * mirrors how the chat model resolves (`chatConfig.model || defaultChatModel`).
-   *
-   * The deprecated `enabled` flag is preserved as an alias: when no effort can be
-   * resolved, `enabled: false` maps to `{ effort: 'off' }` and `enabled: true`
-   * maps to `{ effort: 'minimal' }`.
-   *
-   * @returns The `{ effort }` (and/or `enabled`) object to assign to
-   * `requestBody.thinking`, or `undefined` to send nothing.
-   */
-  private resolveThinking(chatConfig: ChatConfig): Record<string, any> | undefined {
-    const thinking = chatConfig.thinking;
-
-    // Precedence: per-request `effort` > per-request `enabled` alias > SDK-level
-    // `defaultThinkingEffort` > omit (server then defaults to off). The `enabled`
-    // alias MUST be checked BEFORE the SDK default, so an explicit per-request
-    // `enabled: false` is never overridden by a configured default effort.
-    if (thinking?.effort) {
-      return { effort: thinking.effort };
-    }
-    if (thinking?.enabled !== undefined) {
-      return { effort: thinking.enabled ? 'minimal' : 'off' };
-    }
-    if (this.config.defaultThinkingEffort) {
-      return { effort: this.config.defaultThinkingEffort };
-    }
-
-    // Nothing to send — server defaults to off.
-    return undefined;
-  }
-
-  /**
-   * Make a chat completion request (non-streaming)
-   */
-  async chatCompletion(chatConfig: ChatConfig): Promise<ChatCompletionResponse> {
-    assertValidMessages(chatConfig.messages);
-
-    // Ensure token is valid, auto-refresh if needed (browser mode only)
-    await this.authManager.ensureValidToken();
-
-    const token = this.authManager.getToken();
-    if (!token) {
-      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
-
-    const requestBody: Record<string, any> = {
-      model,
-      messages: chatConfig.messages,
-      temperature: chatConfig.temperature ?? 0.7,
-      stream: false,
-      max_tokens: chatConfig.maxTokens || null,
-      seed: chatConfig.seed || null,
-      stop: chatConfig.stop || null,
-      top_p: chatConfig.topP || null,
-    };
-
-    const thinking = this.resolveThinking(chatConfig);
-    if (thinking) {
-      requestBody.thinking = thinking;
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Chat request failed' }));
-        const playKitError = new PlayKitError(
-          error.message || 'Chat request failed',
-          error.code,
-          response.status
-        );
-
-        // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
-          if (this.playerClient) {
-            await this.playerClient.handleInsufficientCredits(playKitError);
-          }
-        }
-
-        throw playKitError;
-      }
-
-      const result = await response.json();
-
-      // Check balance after successful API call
-      if (this.playerClient) {
-        this.playerClient.checkBalanceAfterApiCall().catch(() => {
-          // Silently fail
-        });
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof PlayKitError) {
-        throw error;
-      }
+  async request(input: ChatConfig, stream: boolean, defaultModel?: string): Promise<Response> {
+    if (input.prompt !== undefined && input.messages !== undefined)
+      throw new PlayKitError('Choose messages or a managed prompt', 'INVALID_CHAT_INPUT');
+    if (input.schema !== undefined && input.tools !== undefined)
       throw new PlayKitError(
-        error instanceof Error ? error.message : 'Unknown error',
-        'CHAT_ERROR'
+        'Tools and structured output cannot be combined',
+        'INVALID_CHAT_INPUT'
       );
-    }
-  }
-
-  /**
-   * Make a streaming chat completion request
-   */
-  async chatCompletionStream(
-    chatConfig: ChatConfig
-  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
-    assertValidMessages(chatConfig.messages);
-
-    // Ensure token is valid, auto-refresh if needed (browser mode only)
-    await this.authManager.ensureValidToken();
-
-    const token = this.authManager.getToken();
-    if (!token) {
-      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
-
-    const requestBody: Record<string, any> = {
-      model,
-      messages: chatConfig.messages,
-      temperature: chatConfig.temperature ?? 0.7,
-      stream: true,
-      max_tokens: chatConfig.maxTokens || null,
-      seed: chatConfig.seed || null,
-      stop: chatConfig.stop || null,
-      top_p: chatConfig.topP || null,
-    };
-
-    const thinking = this.resolveThinking(chatConfig);
-    if (thinking) {
-      requestBody.thinking = thinking;
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify(requestBody),
+    if (input.prompt?.version !== undefined && input.prompt.label !== undefined)
+      throw new PlayKitError('Choose a prompt version or label', 'INVALID_CHAT_INPUT');
+    const body: Record<string, unknown> = { stream };
+    for (const key of PARAMETERS) if (input[key] !== undefined) body[key] = input[key];
+    if (input.prompt) {
+      Object.assign(body, {
+        prompt: input.prompt,
+        variables: input.variables,
+        placeholders: input.placeholders,
+        cache: input.cache,
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Chat stream request failed' }));
-        const playKitError = new PlayKitError(
-          error.message || 'Chat stream request failed',
-          error.code,
-          response.status
-        );
-
-        // Check for insufficient credits error
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
-          if (this.playerClient) {
-            await this.playerClient.handleInsufficientCredits(playKitError);
-          }
-        }
-
-        throw playKitError;
-      }
-
-      if (!response.body) {
-        throw new PlayKitError('Response body is null', 'NO_RESPONSE_BODY');
-      }
-
-      // Check balance after successful API call
-      if (this.playerClient) {
-        this.playerClient.checkBalanceAfterApiCall().catch(() => {
-          // Silently fail
-        });
-      }
-
-      return response.body.getReader();
-    } catch (error) {
-      if (error instanceof PlayKitError) {
-        throw error;
-      }
-      throw new PlayKitError(
-        error instanceof Error ? error.message : 'Unknown error',
-        'CHAT_STREAM_ERROR'
-      );
+    } else {
+      assertValidMessages(input.messages);
+      body.messages = input.messages;
+      body.model = input.model ?? defaultModel ?? this.config.defaultChatModel ?? 'default-chat';
+      body.thinking =
+        input.thinking ??
+        (this.config.defaultThinkingEffort
+          ? { effort: this.config.defaultThinkingEffort }
+          : undefined);
     }
+    if (input.signal?.aborted)
+      throw input.signal.reason ?? new DOMException('Request aborted', 'AbortError');
+    await this.auth.ensureValidToken();
+    const token = this.auth.getToken();
+    if (!token) throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
+    const response = await fetch(`${this.baseURL}/ai/${this.config.gameId}/v2/chat`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...getSDKHeaders(),
+      },
+      body: JSON.stringify(body),
+      signal: input.signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const nested =
+        typeof payload.error === 'object' && payload.error !== null ? payload.error : payload;
+      const error = new PlayKitError(
+        typeof payload.error === 'string'
+          ? payload.error
+          : nested.message || response.statusText || 'Chat request failed',
+        nested.code || payload.code || 'CHAT_REQUEST_FAILED',
+        response.status
+      );
+      error.requestId =
+        response.headers.get('X-PlayKit-Request-Id') ?? payload.traceId ?? payload.trace_id;
+      error.details = payload.details ?? nested.details;
+      if (response.status === 402 && this.config.mode !== 'server')
+        await this.playerClient?.handleInsufficientCredits(error);
+      throw error;
+    }
+    return response;
   }
-
-  /**
-   * Make a chat completion request with tools (non-streaming)
-   */
-  async chatCompletionWithTools(chatConfig: ChatConfigWithTools): Promise<ChatCompletionResponse> {
-    assertValidMessages(chatConfig.messages);
-
-    const token = this.authManager.getToken();
-    if (!token) {
-      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
-
-    const requestBody: Record<string, any> = {
-      model,
-      messages: chatConfig.messages,
-      temperature: chatConfig.temperature ?? 0.7,
-      stream: false,
-      max_tokens: chatConfig.maxTokens || null,
-      seed: chatConfig.seed || null,
-      stop: chatConfig.stop || null,
-      top_p: chatConfig.topP || null,
-    };
-
-    // Add tools if provided
-    if (chatConfig.tools?.length) {
-      requestBody.tools = chatConfig.tools;
-    }
-    if (chatConfig.tool_choice) {
-      requestBody.tool_choice = chatConfig.tool_choice;
-    }
-    const thinking = this.resolveThinking(chatConfig);
-    if (thinking) {
-      requestBody.thinking = thinking;
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Chat request failed' }));
-        const playKitError = new PlayKitError(
-          error.message || 'Chat request failed',
-          error.code,
-          response.status
-        );
-
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
-          if (this.playerClient) {
-            await this.playerClient.handleInsufficientCredits(playKitError);
-          }
-        }
-
-        throw playKitError;
-      }
-
-      const result = await response.json();
-
-      if (this.playerClient) {
-        this.playerClient.checkBalanceAfterApiCall().catch(() => {});
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof PlayKitError) {
-        throw error;
-      }
-      throw new PlayKitError(
-        error instanceof Error ? error.message : 'Unknown error',
-        'CHAT_ERROR'
-      );
-    }
-  }
-
-  /**
-   * Make a streaming chat completion request with tools
-   */
-  async chatCompletionWithToolsStream(
-    chatConfig: ChatConfigWithTools
-  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
-    assertValidMessages(chatConfig.messages);
-
-    const token = this.authManager.getToken();
-    if (!token) {
-      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    const model = chatConfig.model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
-
-    const requestBody: Record<string, any> = {
-      model,
-      messages: chatConfig.messages,
-      temperature: chatConfig.temperature ?? 0.7,
-      stream: true,
-      max_tokens: chatConfig.maxTokens || null,
-      seed: chatConfig.seed || null,
-      stop: chatConfig.stop || null,
-      top_p: chatConfig.topP || null,
-    };
-
-    // Add tools if provided
-    if (chatConfig.tools?.length) {
-      requestBody.tools = chatConfig.tools;
-    }
-    if (chatConfig.tool_choice) {
-      requestBody.tool_choice = chatConfig.tool_choice;
-    }
-    const thinking = this.resolveThinking(chatConfig);
-    if (thinking) {
-      requestBody.thinking = thinking;
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Chat stream request failed' }));
-        const playKitError = new PlayKitError(
-          error.message || 'Chat stream request failed',
-          error.code,
-          response.status
-        );
-
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
-          if (this.playerClient) {
-            await this.playerClient.handleInsufficientCredits(playKitError);
-          }
-        }
-
-        throw playKitError;
-      }
-
-      if (!response.body) {
-        throw new PlayKitError('Response body is null', 'NO_RESPONSE_BODY');
-      }
-
-      if (this.playerClient) {
-        this.playerClient.checkBalanceAfterApiCall().catch(() => {});
-      }
-
-      return response.body.getReader();
-    } catch (error) {
-      if (error instanceof PlayKitError) {
-        throw error;
-      }
-      throw new PlayKitError(
-        error instanceof Error ? error.message : 'Unknown error',
-        'CHAT_STREAM_ERROR'
-      );
-    }
-  }
-
-  /**
-   * Generate structured output using JSON schema
-   * Uses the /chat endpoint with response_format for structured output
-   * @param schemaName Name of the schema
-   * @param prompt Text prompt for generation
-   * @param model Model to use
-   * @param temperature Temperature for generation
-   * @param schema Optional JSON schema (if not provided, uses schemaName as reference)
-   * @param schemaDescription Optional description of the schema
-   */
-  async generateStructured<T = any>(
-    schemaName: string,
-    prompt: string,
-    model?: string,
-    temperature?: number,
-    schema?: Record<string, any>,
-    schemaDescription?: string
-  ): Promise<T> {
-    // Ensure token is valid, auto-refresh if needed (browser mode only)
-    await this.authManager.ensureValidToken();
-
-    const token = this.authManager.getToken();
-    if (!token) {
-      throw new PlayKitError('Not authenticated', 'NOT_AUTHENTICATED');
-    }
-
-    const modelToUse = model || this.config.defaultChatModel || 'gpt-4o-mini';
-    const endpoint = `/ai/${this.config.gameId}/v2/chat`;
-
-    const messages = [{ role: 'user' as const, content: prompt }];
-
-    const requestBody: Record<string, any> = {
-      model: modelToUse,
-      messages,
-      temperature: temperature ?? 0.7,
-      stream: false,
-    };
-
-    // Add response_format with json_schema if schema is provided
-    if (schema) {
-      requestBody.response_format = {
-        type: 'json_schema',
-        json_schema: {
-          name: schemaName,
-          description: schemaDescription || '',
-          schema: schema,
-          strict: true,
-        },
-      };
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...getSDKHeaders(),
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Structured generation failed' }));
-        const playKitError = new PlayKitError(
-          error.message || 'Structured generation failed',
-          error.code,
-          response.status
-        );
-
-        if (error.code === 'INSUFFICIENT_CREDITS' || response.status === 402) {
-          if (this.playerClient) {
-            await this.playerClient.handleInsufficientCredits(playKitError);
-          }
-        }
-
-        throw playKitError;
-      }
-
-      const result: ChatCompletionResponse = await response.json();
-
-      if (this.playerClient) {
-        this.playerClient.checkBalanceAfterApiCall().catch(() => {});
-      }
-
-      // Parse the response content as JSON
-      const rawContent = result.choices[0]?.message.content;
-      if (!rawContent) {
-        throw new PlayKitError('No content in response', 'NO_CONTENT');
-      }
-
-      try {
-        const content = contentToString(rawContent);
-        return JSON.parse(content);
-      } catch (parseError) {
-        throw new PlayKitError('Failed to parse structured output', 'PARSE_ERROR');
-      }
-    } catch (error) {
-      if (error instanceof PlayKitError) {
-        throw error;
-      }
-      throw new PlayKitError(
-        error instanceof Error ? error.message : 'Unknown error',
-        'STRUCTURED_GENERATION_ERROR'
-      );
-    }
+  complete(): void {
+    if (this.config.mode !== 'server')
+      this.playerClient?.checkBalanceAfterApiCall().catch(() => {});
   }
 }

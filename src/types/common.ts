@@ -443,6 +443,8 @@ export interface SetNicknameResponse {
  * Error types that can be thrown by the SDK
  */
 export class PlayKitError extends Error {
+  requestId?: string;
+  details?: unknown;
   constructor(
     message: string,
     public code?: string,

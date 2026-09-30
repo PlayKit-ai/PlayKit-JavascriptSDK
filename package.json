@@ -1,6 +1,6 @@
 {
   "name": "playkit-sdk",
-  "version": "1.6.0",
+  "version": "2.0.0-next.1",
   "description": "PlayKit SDK for JavaScript",
   "main": "dist/playkit-sdk.cjs.js",
   "module": "dist/playkit-sdk.esm.js",
@@ -9,6 +9,7 @@
   "files": [
     "dist",
     "README.md",
+    "MIGRATION-v2.md",
     "LICENSE"
   ],
   "scripts": {
@@ -19,7 +20,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "tsx --test tests/*.test.ts"
   },
   "keywords": [
     "ai",
@@ -31,7 +33,6 @@
     "image-generation",
     "text-to-speech",
     "tts",
-    "npc",
     "p5js",
     "game-engine",
     "llm",
@@ -64,9 +65,10 @@
     "rollup": "^4.9.6",
     "rollup-plugin-dts": "^6.1.0",
     "tslib": "^2.6.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "tsx": "^4.22.3"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   }
 }

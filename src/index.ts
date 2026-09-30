@@ -6,28 +6,14 @@
 // Main SDK
 export { PlayKitSDK } from './core/PlayKitSDK';
 
+export { PlayKitError } from './types/common';
+
 // Core clients
 export { ChatClient } from './core/ChatClient';
-export type {
-  ChatWithToolsConfig,
-  ChatWithToolsStreamConfig,
-  StructuredGenerationConfig,
-  StructuredResult,
-} from './core/ChatClient';
 export { ImageClient } from './core/ImageClient';
 export { TranscriptionClient } from './core/TranscriptionClient';
 export { TTSClient } from './core/TTSClient';
-export { NPCClient } from './core/NPCClient';
-export type { NPCConfig, ConversationSaveData, MemoryEntry } from './core/NPCClient';
 export { PlayerClient } from './core/PlayerClient';
-
-// Schema Library
-export { SchemaLibrary, defaultSchemaLibrary } from './core/SchemaLibrary';
-export type { SchemaEntry } from './core/SchemaLibrary';
-
-// AI Context Manager
-export { AIContextManager, defaultContextManager } from './core/AIContextManager';
-export type { AIContextManagerConfig, AIContextManagerEvents } from './core/AIContextManager';
 
 // Authentication
 export { AuthManager } from './auth/AuthManager';
@@ -68,15 +54,25 @@ export type {
   PlayerInfo,
   SetNicknameRequest,
   SetNicknameResponse,
-  PlayKitError,
   DeveloperTokenFallbackConfig,
   // Chat types
   ChatConfig,
   ChatStreamConfig,
   ChatResult,
-  StructuredOutputConfig,
   ChatCompletionResponse,
-  StreamChunk,
+  ChatParameters,
+  ChatInput,
+  ChatOutput,
+  ChatStreamEvent,
+  ChatStreamMetadata,
+  ChatUsage,
+  ChatTool,
+  JsonSchema,
+  ToolChoice,
+  PromptRunReceipt,
+  PromptSelector,
+  PromptVariables,
+  PromptPlaceholders,
   Effort,
   // Image types
   ImageSize,
@@ -111,7 +107,6 @@ export type {
 } from './types/recharge';
 
 // Utilities
-export { StreamParser } from './utils/StreamParser';
 export { TokenValidator, defaultTokenValidator } from './utils/TokenValidator';
 export type {
   ValidatedPlayerInfo,
@@ -142,3 +137,4 @@ declare global {
     };
   }
 }
+

@@ -7,7 +7,6 @@ An interactive playground for testing and exploring PlayKit SDK features.
 - **Multiple Authentication Methods**: Choose between developer token (for testing) or automatic player login (for production)
 - **Text Generation**: Test AI chat with customizable models and system prompts, with streaming support
 - **Image Generation**: Generate images with any model (default: flux-1-schnell), display them in a P5.js canvas, and browse a gallery
-- **NPC Conversations**: Create and manage multiple NPCs with custom personalities, save/load conversation history
 - **Flexible Model Selection**: Enter any chat or image model name (not limited to preset options)
 - **Bilingual Support**: Switch between English and Chinese (中文) interface
 - **Beautiful UI**: Modern interface built with Tailwind CSS
@@ -71,22 +70,6 @@ Then visit: `http://localhost:8000/examples/playground/`
 4. View the result in the P5.js canvas
 5. Click any image in the gallery to view it again
 
-### NPC Conversations
-
-1. **Create an NPC**:
-   - Enter a name (e.g., "Guard", "Shopkeeper")
-   - Write a system prompt defining the NPC's personality
-   - Click "Create NPC"
-
-2. **Chat with NPC**:
-   - Select the NPC from the dropdown
-   - Type your message and send
-   - The NPC will respond based on its personality
-
-3. **Manage History**:
-   - **Save History**: Save conversation to localStorage
-   - **Load History**: Restore saved conversation
-   - **Reset**: Clear conversation and start fresh
 
 ## Features in Detail
 
@@ -106,7 +89,7 @@ The playground supports both authentication modes:
 
 ### Streaming
 
-Text generation and NPC conversations support streaming:
+Text generation supports streaming:
 - See responses appear word-by-word
 - More engaging user experience
 - Uses Server-Sent Events (SSE)
@@ -122,21 +105,18 @@ Images are displayed using P5.js canvas:
 
 The playground automatically saves:
 - Your configuration (Game ID, models)
-- NPC conversation histories
 - Auth tokens (encrypted)
 
 ## Keyboard Shortcuts
 
-- `Enter` in chat/NPC input: Send message
+- `Enter` in chat input: Send message
 - `Tab` between fields for quick navigation
 
 ## Tips
 
 1. **Start Simple**: Try "Hello, who are you?" for chat testing
 2. **Image Prompts**: Be descriptive! "A red dragon flying over a medieval castle at sunset" works better than "dragon"
-3. **NPC Personalities**: Include role, personality traits, and background in system prompt
-4. **Save Often**: Use "Save History" for NPCs you want to continue later
-5. **Debug Mode**: Enable for detailed console logs
+3. **Debug Mode**: Enable for detailed console logs
 
 ## Troubleshooting
 
@@ -153,10 +133,6 @@ Make sure you've entered a Game ID and clicked "Initialize SDK"
 - Try DALL-E 2 for faster results
 - Larger images take longer to generate
 
-### NPC Not Responding
-- Ensure SDK is initialized
-- Check you've created and selected an NPC
-- Verify your system prompt is not empty
 
 ## Browser Compatibility
 

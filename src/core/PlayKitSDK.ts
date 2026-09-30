@@ -15,31 +15,26 @@ import { ChatClient } from './ChatClient';
 import { ImageClient } from './ImageClient';
 import { TranscriptionClient } from './TranscriptionClient';
 import { TTSClient } from './TTSClient';
-import { NPCClient, NPCConfig } from './NPCClient';
 import { RechargeConfig } from '../types/recharge';
-import { AIContextManager, AIContextManagerConfig } from './AIContextManager';
-import { SchemaLibrary } from './SchemaLibrary';
 import { Logger, LogLevel, LogConfig } from '../utils/Logger';
 
 export class PlayKitSDK extends EventEmitter {
-  private config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig };
+  private config: SDKConfig & { recharge?: RechargeConfig };
   private authManager: AuthManager;
   private playerClient: PlayerClient;
   private chatProvider: ChatProvider;
   private imageProvider: ImageProvider;
   private transcriptionProvider: TranscriptionProvider;
   private ttsProvider: TTSProvider;
-  private contextManager: AIContextManager;
-  private schemaLibrary: SchemaLibrary;
   private initialized: boolean = false;
   private devTokenIndicator: HTMLDivElement | null = null;
   private logger: Logger;
   private fallbackConfig: DeveloperTokenFallbackConfig;
 
-  constructor(config: SDKConfig & { recharge?: RechargeConfig; aiContext?: AIContextManagerConfig }) {
+  constructor(config: SDKConfig & { recharge?: RechargeConfig }) {
     super();
     this.config = {
-      defaultChatModel: 'gpt-4o-mini',
+      defaultChatModel: 'default-chat',
       defaultImageModel: 'dall-e-3',
       debug: false,
       ...config,
@@ -68,14 +63,6 @@ export class PlayKitSDK extends EventEmitter {
     this.imageProvider.setPlayerClient(this.playerClient);
     this.transcriptionProvider.setPlayerClient(this.playerClient);
     this.ttsProvider.setPlayerClient(this.playerClient);
-
-    // Initialize AI context manager
-    this.contextManager = new AIContextManager(this.config.aiContext);
-    // Set chat client factory for compaction
-    this.contextManager.setChatClientFactory(() => this.createChatClient());
-
-    // Initialize schema library
-    this.schemaLibrary = new SchemaLibrary();
 
     // Forward authentication events
     this.authManager.on('authenticated', (authState) => {
@@ -130,8 +117,8 @@ export class PlayKitSDK extends EventEmitter {
         this.showDeveloperTokenIndicator();
       }
 
-      // Always verify token validity and fetch user info after authentication
-      if (this.authManager.isAuthenticated()) {
+      // Browser sessions load player state for the interactive account UI.
+      if (this.authManager.isAuthenticated() && this.config.mode !== 'server') {
         try {
           await this.playerClient.getPlayerInfo();
           this.logger.debug('Token validated and user info fetched');
@@ -304,19 +291,9 @@ export class PlayKitSDK extends EventEmitter {
     return await this.playerClient.getPlayerInfo();
   }
 
-  /**
-   * Create a chat client
-   * Automatically uses the SDK's schema library
-   */
   createChatClient(model?: string): ChatClient {
     this.ensureInitialized();
-    const client = new ChatClient(
-      this.chatProvider,
-      model || this.config.defaultChatModel
-    );
-    // Automatically use the SDK's schema library
-    client.setSchemaLibrary(this.schemaLibrary);
-    return client;
+    return new ChatClient(this.chatProvider, model);
   }
 
   /**
@@ -346,21 +323,6 @@ export class PlayKitSDK extends EventEmitter {
   }
 
   /**
-   * Create an NPC client
-   * Automatically registers with AIContextManager
-   */
-  createNPCClient(config?: NPCConfig & { model?: string }): NPCClient {
-    this.ensureInitialized();
-    const chatClient = this.createChatClient(config?.model);
-    const npc = new NPCClient(chatClient, config);
-
-    // Register with context manager
-    this.contextManager.registerNpc(npc);
-
-    return npc;
-  }
-
-  /**
    * Get current authentication token (convenience method)
    * Returns undefined if not authenticated
    */
@@ -387,38 +349,6 @@ export class PlayKitSDK extends EventEmitter {
    */
   getPlayerClient(): PlayerClient {
     return this.playerClient;
-  }
-
-  /**
-   * Get AI context manager
-   * Use this to manage player descriptions, NPC tracking, and conversation compaction
-   */
-  getContextManager(): AIContextManager {
-    return this.contextManager;
-  }
-
-  /**
-   * Get the schema library
-   * Use this to register schemas for structured output generation
-   */
-  getSchemaLibrary(): SchemaLibrary {
-    return this.schemaLibrary;
-  }
-
-  /**
-   * Set the player description for AI context
-   * Convenience method - delegates to AIContextManager
-   */
-  setPlayerDescription(description: string): void {
-    this.contextManager.setPlayerDescription(description);
-  }
-
-  /**
-   * Get the player description
-   * Convenience method - delegates to AIContextManager
-   */
-  getPlayerDescription(): string | null {
-    return this.contextManager.getPlayerDescription();
   }
 
   /**

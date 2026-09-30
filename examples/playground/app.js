@@ -2,16 +2,10 @@
 let sdk = null;
 let chatClient = null;
 let imageClient = null;
-let npcs = new Map(); // Map<name, NPCClient>
-let currentNPC = null;
 let p5Instance = null;
 let lastGeneratedImage = null; // Store last generated image for download
 let img2imgData = null; // Store img2img input image
 let chatAttachments = []; // Store chat image attachments
-
-// NPC Actions state
-let actionsNPC = null;
-let definedActions = [];
 
 // DOM Elements
 const elements = {
@@ -59,38 +53,10 @@ const elements = {
   img2imgClear: document.getElementById('img2img-clear'),
   img2imgPreview: document.getElementById('img2img-preview'),
 
-  // NPC
-  npcList: document.getElementById('npc-list'),
-  npcName: document.getElementById('npc-name'),
-  npcSystemPrompt: document.getElementById('npc-system-prompt'),
-  npcCreate: document.getElementById('npc-create'),
-  npcConversationContainer: document.getElementById('npc-conversation-container'),
-  npcMessages: document.getElementById('npc-messages'),
-  npcInput: document.getElementById('npc-input'),
-  npcSend: document.getElementById('npc-send'),
-  npcSave: document.getElementById('npc-save'),
-  npcLoad: document.getElementById('npc-load'),
-  npcReset: document.getElementById('npc-reset'),
-
   // Recharge
   rechargeButton: document.getElementById('recharge-button'),
 
-  // NPC Actions
-  actionsNpcPrompt: document.getElementById('actions-npc-prompt'),
-  actionsList: document.getElementById('actions-list'),
-  customActionName: document.getElementById('custom-action-name'),
-  customActionDesc: document.getElementById('custom-action-desc'),
-  addCustomAction: document.getElementById('add-custom-action'),
-  createActionsNpc: document.getElementById('create-actions-npc'),
-  actionsConversationContainer: document.getElementById('actions-conversation-container'),
-  actionEvents: document.getElementById('action-events'),
-  actionsMessages: document.getElementById('actions-messages'),
-  actionsInput: document.getElementById('actions-input'),
-  actionsSend: document.getElementById('actions-send'),
-  actionsReset: document.getElementById('actions-reset'),
-  presetMerchant: document.getElementById('action-preset-merchant'),
-  presetQuest: document.getElementById('action-preset-quest'),
-  presetGuard: document.getElementById('action-preset-guard'),
+
 };
 
 // Initialize
@@ -99,7 +65,6 @@ function init() {
   setupP5Canvas();
   loadSavedConfig();
   initializeI18n();
-  initializeNpcActions();
 }
 
 // Initialize i18n
@@ -165,39 +130,10 @@ function setupEventListeners() {
   // Chat image attachments
   elements.chatImageInput.addEventListener('change', handleChatImageInput);
 
-  // NPC
-  elements.npcCreate.addEventListener('click', createNPC);
-  elements.npcList.addEventListener('change', selectNPC);
-  elements.npcSend.addEventListener('click', sendNPCMessage);
-  elements.npcInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendNPCMessage();
-  });
-  elements.npcSave.addEventListener('click', saveNPCHistory);
-  elements.npcLoad.addEventListener('click', loadNPCHistory);
-  elements.npcReset.addEventListener('click', resetNPCHistory);
-
   // Recharge
   elements.rechargeButton.addEventListener('click', openRecharge);
 
-  // NPC Actions
-  elements.presetMerchant.addEventListener('click', () => loadActionPreset('merchant'));
-  elements.presetQuest.addEventListener('click', () => loadActionPreset('quest'));
-  elements.presetGuard.addEventListener('click', () => loadActionPreset('guard'));
-  elements.addCustomAction.addEventListener('click', addCustomAction);
-  elements.createActionsNpc.addEventListener('click', createActionsNPC);
-  elements.actionsSend.addEventListener('click', sendActionsMessage);
-  elements.actionsInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendActionsMessage();
-  });
-  elements.actionsReset.addEventListener('click', resetActionsConversation);
 
-  // Quick action messages
-  document.querySelectorAll('.quick-action-msg').forEach(btn => {
-    btn.addEventListener('click', () => {
-      elements.actionsInput.value = btn.dataset.msg;
-      sendActionsMessage();
-    });
-  });
 }
 
 // Setup P5.js Canvas
@@ -419,8 +355,6 @@ async function initializeSDK() {
     // Enable UI
     elements.chatSend.disabled = false;
     elements.imageGenerate.disabled = false;
-    elements.npcCreate.disabled = false;
-    elements.createActionsNpc.disabled = false;
 
     // Update credit display for player accounts
     await updateCreditDisplay();
@@ -452,17 +386,13 @@ async function logout() {
     sdk = null;
     chatClient = null;
     imageClient = null;
-    npcs.clear();
-    currentNPC = null;
 
     // Disable UI
     elements.chatSend.disabled = true;
     elements.imageGenerate.disabled = true;
-    elements.npcCreate.disabled = true;
 
     // Clear messages
     elements.chatMessages.innerHTML = `<p class="text-gray-400 text-sm">${i18n.t('messagesPlaceholder')}</p>`;
-    elements.npcMessages.innerHTML = `<p class="text-gray-400 text-sm">${i18n.t('npcPlaceholder')}</p>`;
 
   } catch (error) {
     console.error('Logout failed:', error);
@@ -529,7 +459,7 @@ async function sendChatMessage() {
       const aiMessageId = addChatMessage('assistant', '');
       const aiMessageElement = document.getElementById(aiMessageId);
 
-      await chatClient.textGenerationStream({
+      await chatClient.stream({
         messages,
         temperature,
         onChunk: (chunk) => {
@@ -539,7 +469,7 @@ async function sendChatMessage() {
       });
     } else {
       // Non-streaming response with temperature
-      const result = await chatClient.textGeneration({
+      const result = await chatClient.generate({
         messages,
         temperature
       });
@@ -802,163 +732,6 @@ function addImageToGallery(result, prompt) {
   elements.imageGallery.insertBefore(galleryItem, elements.imageGallery.firstChild);
 }
 
-// NPC Functions
-function createNPC() {
-  if (!sdk) {
-    showNotification(i18n.t('initFirst'), 'error');
-    return;
-  }
-
-  const name = elements.npcName.value.trim();
-  const systemPrompt = elements.npcSystemPrompt.value.trim();
-
-  if (!name) {
-    showNotification(i18n.t('enterNPCName'), 'error');
-    return;
-  }
-
-  if (!systemPrompt) {
-    showNotification(i18n.t('enterNPCPrompt'), 'error');
-    return;
-  }
-
-  if (npcs.has(name)) {
-    showNotification(i18n.t('npcExists'), 'error');
-    return;
-  }
-
-  // Create NPC client
-  const npcClient = sdk.createNPCClient({
-    systemPrompt,
-    model: elements.chatModel.value,
-  });
-
-  npcs.set(name, npcClient);
-
-  // Add to dropdown
-  const option = document.createElement('option');
-  option.value = name;
-  option.textContent = name;
-  elements.npcList.appendChild(option);
-
-  // Select the new NPC
-  elements.npcList.value = name;
-  selectNPC();
-
-  // Clear inputs
-  elements.npcName.value = '';
-  elements.npcSystemPrompt.value = '';
-
-  showNotification(i18n.t('npcCreated', { name }), 'success');
-}
-
-function selectNPC() {
-  const name = elements.npcList.value;
-  if (!name) {
-    elements.npcConversationContainer.classList.add('hidden');
-    currentNPC = null;
-    return;
-  }
-
-  currentNPC = npcs.get(name);
-  elements.npcConversationContainer.classList.remove('hidden');
-  elements.npcMessages.innerHTML = `<p class="text-gray-400 text-sm">${i18n.t('startConversation', { name })}</p>`;
-}
-
-async function sendNPCMessage() {
-  if (!currentNPC) {
-    showNotification(i18n.t('selectNPCFirst'), 'error');
-    return;
-  }
-
-  const message = elements.npcInput.value.trim();
-  if (!message) return;
-
-  addNPCMessage('user', message);
-  elements.npcInput.value = '';
-  elements.npcSend.disabled = true;
-
-  try {
-    const aiMessageId = addNPCMessage('assistant', '');
-    const aiMessageElement = document.getElementById(aiMessageId);
-
-    await currentNPC.talkStream(message, (chunk) => {
-      aiMessageElement.textContent += chunk;
-      elements.npcMessages.scrollTop = elements.npcMessages.scrollHeight;
-    });
-  } catch (error) {
-    console.error('NPC error:', error);
-    addNPCMessage('system', `Error: ${error.message}`, 'error');
-  } finally {
-    elements.npcSend.disabled = false;
-  }
-}
-
-function addNPCMessage(role, content) {
-  const messageDiv = document.createElement('div');
-  const messageId = `npc-msg-${Date.now()}-${Math.random()}`;
-  messageDiv.id = messageId;
-  messageDiv.className = 'message mb-3 p-3 rounded-lg';
-
-  if (role === 'user') {
-    messageDiv.classList.add('bg-blue-100', 'ml-auto', 'max-w-[80%]');
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-blue-900 mb-1">${i18n.t('you')}</div><div class="text-gray-800">${escapeHtml(content)}</div>`;
-  } else if (role === 'assistant') {
-    messageDiv.classList.add('bg-gray-100', 'mr-auto', 'max-w-[80%]');
-    const npcName = elements.npcList.value;
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-gray-900 mb-1">${npcName}</div><div class="text-gray-800">${escapeHtml(content)}</div>`;
-  } else {
-    messageDiv.classList.add('bg-red-100', 'mx-auto', 'max-w-[80%]');
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-red-900">${escapeHtml(content)}</div>`;
-  }
-
-  // Clear placeholder if exists
-  if (elements.npcMessages.querySelector('.text-gray-400')) {
-    elements.npcMessages.innerHTML = '';
-  }
-
-  elements.npcMessages.appendChild(messageDiv);
-  elements.npcMessages.scrollTop = elements.npcMessages.scrollHeight;
-
-  return messageId;
-}
-
-function saveNPCHistory() {
-  if (!currentNPC) return;
-
-  const name = elements.npcList.value;
-  const key = `npc-history-${name}`;
-
-  currentNPC.saveHistory(key);
-  showNotification(i18n.t('historySaved', { name }), 'success');
-}
-
-function loadNPCHistory() {
-  if (!currentNPC) return;
-
-  const name = elements.npcList.value;
-  const key = `npc-history-${name}`;
-
-  const loaded = currentNPC.loadHistory(key);
-  if (loaded) {
-    showNotification(i18n.t('historyLoaded', { name }), 'success');
-    elements.npcMessages.innerHTML = `<p class="text-gray-400 text-sm">${i18n.t('historyLoadedMsg')}</p>`;
-  } else {
-    showNotification(i18n.t('noHistory'), 'error');
-  }
-}
-
-function resetNPCHistory() {
-  if (!currentNPC) return;
-
-  if (confirm(i18n.t('confirmReset'))) {
-    currentNPC.resetHistory();
-    const name = elements.npcList.value;
-    elements.npcMessages.innerHTML = `<p class="text-gray-400 text-sm">${i18n.t('historyResetMsg', { name })}</p>`;
-    showNotification(i18n.t('historyReset'), 'success');
-  }
-}
-
 // Utility Functions
 function showNotification(message, type = 'info') {
   const colors = {
@@ -1001,292 +774,6 @@ function openRecharge() {
 
   sdk.openRechargeWindow();
   showNotification('Recharge window opened', 'success');
-}
-
-// ===== NPC Actions Functions =====
-
-// Action presets
-const ACTION_PRESETS = {
-  merchant: {
-    prompt: "You are a friendly merchant in a fantasy town. You sell potions, weapons, and armor. You're always looking for good deals and love to haggle. When the player wants to buy something, use the openShop action. When saying goodbye, use the farewell action.",
-    actions: [
-      { actionName: 'openShop', description: 'Open the shop interface to show available items for purchase', parameters: [] },
-      { actionName: 'showItem', description: 'Show details about a specific item', parameters: [
-        { name: 'itemName', description: 'Name of the item to show', type: 'string', required: true }
-      ]},
-      { actionName: 'offerDiscount', description: 'Offer a discount to the player', parameters: [
-        { name: 'percentage', description: 'Discount percentage (1-50)', type: 'number', required: true }
-      ]},
-      { actionName: 'farewell', description: 'Say goodbye and close the conversation', parameters: [] }
-    ]
-  },
-  quest: {
-    prompt: "You are a mysterious quest giver in a fantasy RPG. You have important missions for brave adventurers. You speak in an enigmatic manner. Use giveQuest when offering a mission, and updateQuestLog when providing information about ongoing quests.",
-    actions: [
-      { actionName: 'giveQuest', description: 'Give a new quest to the player', parameters: [
-        { name: 'questName', description: 'Name of the quest', type: 'string', required: true },
-        { name: 'difficulty', description: 'Quest difficulty level', type: 'stringEnum', enumOptions: ['easy', 'medium', 'hard', 'legendary'], required: true }
-      ]},
-      { actionName: 'updateQuestLog', description: 'Update the quest log with new information', parameters: [
-        { name: 'message', description: 'The update message', type: 'string', required: true }
-      ]},
-      { actionName: 'giveReward', description: 'Give a reward to the player', parameters: [
-        { name: 'rewardType', description: 'Type of reward', type: 'stringEnum', enumOptions: ['gold', 'item', 'experience'], required: true },
-        { name: 'amount', description: 'Amount of the reward', type: 'number', required: true }
-      ]}
-    ]
-  },
-  guard: {
-    prompt: "You are a stern city guard protecting the gates. You're suspicious of strangers but fair. You can grant or deny entry, issue warnings, or call for backup if needed.",
-    actions: [
-      { actionName: 'grantEntry', description: 'Allow the player to enter the city', parameters: [] },
-      { actionName: 'denyEntry', description: 'Deny entry to the player', parameters: [
-        { name: 'reason', description: 'Reason for denial', type: 'string', required: true }
-      ]},
-      { actionName: 'issueWarning', description: 'Issue an official warning to the player', parameters: [
-        { name: 'severity', description: 'Severity of warning', type: 'stringEnum', enumOptions: ['mild', 'serious', 'final'], required: true }
-      ]},
-      { actionName: 'callBackup', description: 'Call for additional guards', parameters: [] }
-    ]
-  }
-};
-
-// Initialize NPC Actions with default merchant preset
-function initializeNpcActions() {
-  loadActionPreset('merchant');
-}
-
-// Load an action preset
-function loadActionPreset(presetName) {
-  const preset = ACTION_PRESETS[presetName];
-  if (!preset) return;
-
-  elements.actionsNpcPrompt.value = preset.prompt;
-  definedActions = JSON.parse(JSON.stringify(preset.actions)); // Deep clone
-  renderActionsList();
-
-  // Highlight the selected preset button
-  [elements.presetMerchant, elements.presetQuest, elements.presetGuard].forEach(btn => {
-    btn.classList.remove('ring-2', 'ring-offset-2');
-  });
-
-  const buttonMap = {
-    merchant: elements.presetMerchant,
-    quest: elements.presetQuest,
-    guard: elements.presetGuard
-  };
-
-  if (buttonMap[presetName]) {
-    buttonMap[presetName].classList.add('ring-2', 'ring-offset-2');
-  }
-}
-
-// Render the actions list
-function renderActionsList() {
-  elements.actionsList.innerHTML = '';
-
-  if (definedActions.length === 0) {
-    elements.actionsList.innerHTML = '<p class="text-gray-400 text-xs">No actions defined yet...</p>';
-    return;
-  }
-
-  definedActions.forEach((action, index) => {
-    const actionDiv = document.createElement('div');
-    actionDiv.className = 'flex items-center justify-between bg-white border border-gray-200 rounded px-3 py-2';
-
-    const paramsText = action.parameters && action.parameters.length > 0
-      ? `(${action.parameters.map(p => p.name).join(', ')})`
-      : '()';
-
-    actionDiv.innerHTML = `
-      <div class="flex-1">
-        <span class="font-mono text-sm text-blue-600">${escapeHtml(action.actionName)}</span>
-        <span class="text-xs text-gray-500">${paramsText}</span>
-        <p class="text-xs text-gray-500 truncate">${escapeHtml(action.description)}</p>
-      </div>
-      <button class="ml-2 text-red-500 hover:text-red-700 text-sm" data-index="${index}">
-        &times;
-      </button>
-    `;
-
-    // Remove button handler
-    actionDiv.querySelector('button').addEventListener('click', () => {
-      definedActions.splice(index, 1);
-      renderActionsList();
-    });
-
-    elements.actionsList.appendChild(actionDiv);
-  });
-}
-
-// Add a custom action
-function addCustomAction() {
-  const name = elements.customActionName.value.trim();
-  const desc = elements.customActionDesc.value.trim();
-
-  if (!name) {
-    showNotification('Please enter an action name', 'error');
-    return;
-  }
-
-  if (!desc) {
-    showNotification('Please enter an action description', 'error');
-    return;
-  }
-
-  // Check for duplicate
-  if (definedActions.some(a => a.actionName === name)) {
-    showNotification('An action with this name already exists', 'error');
-    return;
-  }
-
-  definedActions.push({
-    actionName: name,
-    description: desc,
-    parameters: []
-  });
-
-  elements.customActionName.value = '';
-  elements.customActionDesc.value = '';
-  renderActionsList();
-  showNotification(`Action "${name}" added`, 'success');
-}
-
-// Create NPC with actions
-function createActionsNPC() {
-  if (!sdk) {
-    showNotification('Please initialize SDK first', 'error');
-    return;
-  }
-
-  const systemPrompt = elements.actionsNpcPrompt.value.trim();
-  if (!systemPrompt) {
-    showNotification('Please enter an NPC character description', 'error');
-    return;
-  }
-
-  if (definedActions.length === 0) {
-    showNotification('Please define at least one action', 'error');
-    return;
-  }
-
-  // Create NPC client
-  actionsNPC = sdk.createNPCClient({
-    systemPrompt,
-    model: elements.chatModel.value,
-  });
-
-  // Show conversation container
-  elements.actionsConversationContainer.classList.remove('hidden');
-  elements.actionsMessages.innerHTML = '<p class="text-gray-400 text-sm">NPC ready! Talk to trigger actions...</p>';
-  elements.actionEvents.innerHTML = '<p class="text-gray-500"># NPC created with ' + definedActions.length + ' actions</p>';
-
-  showNotification('NPC with Actions created!', 'success');
-}
-
-// Send message to actions NPC
-async function sendActionsMessage() {
-  if (!actionsNPC) {
-    showNotification('Please create an NPC with actions first', 'error');
-    return;
-  }
-
-  const message = elements.actionsInput.value.trim();
-  if (!message) return;
-
-  // Add user message to UI
-  addActionsMessage('user', message);
-  elements.actionsInput.value = '';
-  elements.actionsSend.disabled = true;
-
-  try {
-    // Use talkWithActions
-    const response = await actionsNPC.talkWithActions(message, definedActions);
-
-    if (response) {
-      // Add NPC text response
-      if (response.text) {
-        addActionsMessage('assistant', response.text);
-      }
-
-      // Process action calls
-      if (response.hasActions && response.actionCalls) {
-        for (const actionCall of response.actionCalls) {
-          logActionEvent(actionCall);
-
-          // Report success for demo purposes
-          actionsNPC.reportActionResult(actionCall.id, JSON.stringify({ success: true, message: 'Action executed' }));
-        }
-      }
-    } else {
-      addActionsMessage('system', 'No response from NPC', 'error');
-    }
-  } catch (error) {
-    console.error('Actions NPC error:', error);
-    addActionsMessage('system', `Error: ${error.message}`, 'error');
-  } finally {
-    elements.actionsSend.disabled = false;
-  }
-}
-
-// Add message to actions chat
-function addActionsMessage(role, content, type = '') {
-  const messageDiv = document.createElement('div');
-  messageDiv.className = 'message mb-3 p-3 rounded-lg';
-
-  if (role === 'user') {
-    messageDiv.classList.add('bg-blue-100', 'ml-auto', 'max-w-[80%]');
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-blue-900 mb-1">You</div><div class="text-gray-800">${escapeHtml(content)}</div>`;
-  } else if (role === 'assistant') {
-    messageDiv.classList.add('bg-gray-100', 'mr-auto', 'max-w-[80%]');
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-gray-900 mb-1">NPC</div><div class="text-gray-800">${escapeHtml(content)}</div>`;
-  } else {
-    messageDiv.classList.add('bg-red-100', 'mx-auto', 'max-w-[80%]');
-    messageDiv.innerHTML = `<div class="text-sm font-medium text-red-900">${escapeHtml(content)}</div>`;
-  }
-
-  // Clear placeholder if exists
-  if (elements.actionsMessages.querySelector('.text-gray-400')) {
-    elements.actionsMessages.innerHTML = '';
-  }
-
-  elements.actionsMessages.appendChild(messageDiv);
-  elements.actionsMessages.scrollTop = elements.actionsMessages.scrollHeight;
-}
-
-// Log action event
-function logActionEvent(actionCall) {
-  const timestamp = new Date().toLocaleTimeString();
-  const argsStr = JSON.stringify(actionCall.arguments, null, 0);
-
-  const eventLine = document.createElement('div');
-  eventLine.className = 'mb-1';
-  eventLine.innerHTML = `
-    <span class="text-gray-500">[${timestamp}]</span>
-    <span class="text-yellow-400">ACTION:</span>
-    <span class="text-green-400">${escapeHtml(actionCall.actionName)}</span>
-    <span class="text-blue-400">${escapeHtml(argsStr)}</span>
-  `;
-
-  // Clear placeholder if exists
-  if (elements.actionEvents.querySelector('.text-gray-500:first-child')) {
-    elements.actionEvents.innerHTML = '';
-  }
-
-  elements.actionEvents.appendChild(eventLine);
-  elements.actionEvents.scrollTop = elements.actionEvents.scrollHeight;
-}
-
-// Reset actions conversation
-function resetActionsConversation() {
-  if (!confirm('Reset the conversation and create a new NPC?')) return;
-
-  actionsNPC = null;
-  elements.actionsConversationContainer.classList.add('hidden');
-  elements.actionsMessages.innerHTML = '<p class="text-gray-400 text-sm">Talk to the NPC and watch for actions...</p>';
-  elements.actionEvents.innerHTML = '<p class="text-gray-500"># Action events will appear here...</p>';
-
-  showNotification('Conversation reset', 'success');
 }
 
 // Initialize on load
